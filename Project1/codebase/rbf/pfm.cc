@@ -41,13 +41,27 @@ RC PagedFileManager::createFile(const string &fileName)
 
 RC PagedFileManager::destroyFile(const string &fileName)
 {
-    return -1;
+    if(remove(fileName) != 0){
+        perror("");
+        return -1;
+    }
+    return 0;
 }
 
 
 RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 {
-    return -1;
+    if(fileHandle->fp == NULL){
+        perror("fileHandle already handle for file")
+        return -1;
+    }
+
+    if((fileHandle->fp = fopen(fileName, "rwa+")) == nullptr){
+        perror("fileHandle could not open " + fileName)
+        return -1;
+    } 
+
+    return 1;
 }
 
 
@@ -59,6 +73,7 @@ RC PagedFileManager::closeFile(FileHandle &fileHandle)
 
 FileHandle::FileHandle()
 {
+    fp = NULL;
 	readPageCounter = 0;
 	writePageCounter = 0;
 	appendPageCounter = 0;
