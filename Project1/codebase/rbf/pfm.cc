@@ -72,6 +72,16 @@ FileHandle::~FileHandle()
 
 RC FileHandle::readPage(PageNum pageNum, void *data)
 {
+
+//    int numPages = getNumberOfPages();
+
+    // If page doesn't exist, return error.
+//    if(pageNum < 0 || pageNum < numPages){
+//        return -1;
+//    }
+    readPageCounter += 1;
+    return 0;
+
     return -1;
 }
 
@@ -90,6 +100,7 @@ RC FileHandle::appendPage(const void *data)
 
 unsigned FileHandle::getNumberOfPages()
 {
+//    fseek();
     return -1;
 }
 
