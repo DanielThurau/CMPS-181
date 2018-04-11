@@ -1,3 +1,4 @@
 makefile.inc
 *.o
 rbftest*
+*.a
