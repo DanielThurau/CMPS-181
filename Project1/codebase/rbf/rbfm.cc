@@ -1,3 +1,4 @@
+#include <math.h>
 #include "rbfm.h"
 
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = 0;
@@ -60,6 +61,15 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
+    unsigned recordLength = 0;
+    for (int i = 0; i < recordDescriptor.size(); i++) {
+        // art
+        bool attrNull = (128 >> (i % 8)) & *((uint8_t*)data + i / 8);
+        if (!attrNull) {
+            recordLength += recordDescriptor[i].length;
+        }
+    }
+
     return -1;
 }
 
