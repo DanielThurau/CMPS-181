@@ -118,7 +118,7 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
         perror("writePage: seek failed");
         return -1;
     }
-    if(fwrite(data, PAGE_SIZE, PAGE_SIZE, this->fp) != PAGE_SIZE){
+    if(fwrite(data, 1, PAGE_SIZE, this->fp) != PAGE_SIZE){
         perror("writePage: write failed");
         return -2;
     }
