@@ -93,6 +93,18 @@ FileHandle::~FileHandle()
 
 RC FileHandle::readPage(PageNum pageNum, void *data)
 {
+
+    // If page doesn't exist, return error.
+    if(pageNum < 0 || pageNum < getNumberOfPages()){
+        perror("Unable to read page " + pageNum);
+        return -1;
+    }
+
+
+
+    readPageCounter += 1;
+    return 0;
+
     return -1;
 }
 
@@ -123,7 +135,19 @@ RC FileHandle::appendPage(const void *data)
 
 unsigned FileHandle::getNumberOfPages()
 {
-    return -1;
+
+    unsigned numPages, fileSize;
+
+    fseek(fp, 0, SEEK_END);
+    fileSize = ftell(fp);
+    if(fileSize < 0){
+        perror("Could not read number of pages.")
+        return -1;
+    }
+    
+    numPages = fileSize / PAGE_SIZE;
+    return numPages;
+
 }
 
 
