@@ -5,6 +5,9 @@ typedef unsigned PageNum;
 typedef int RC;
 typedef char byte;
 
+
+#define eprintf(...) fprintf (stderr, __VA_ARGS__)
+
 #define PAGE_SIZE 4096
 #include <string>
 #include <climits>

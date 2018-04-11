@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "pfm.h"
 
-#define eprintf(...) fprintf (stderr, __VA_ARGS__)
 
 PagedFileManager* PagedFileManager::_pf_manager = 0;
 
