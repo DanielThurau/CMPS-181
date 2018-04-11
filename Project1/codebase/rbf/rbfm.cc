@@ -23,7 +23,7 @@ RecordBasedFileManager::~RecordBasedFileManager()
 RC RecordBasedFileManager::createFile(const string &fileName) {
     RC rc;
     if((rc = this->pfm->createFile(fileName)) != 0){
-        perror("PagedFileManager API call: createFile failed");
+        eprintf("PagedFileManager API call: createFile failed on file %s", fileName.c_str());
         return rc;
     }
 
@@ -33,7 +33,7 @@ RC RecordBasedFileManager::createFile(const string &fileName) {
 RC RecordBasedFileManager::destroyFile(const string &fileName) {
     RC rc;
     if((rc = this->pfm->destroyFile(fileName)) != 0){
-        perror("PagedFileManager API call: destroyFile failed");
+        eprintf("PagedFileManager API call: destroyFile failed on file %s", fileName.c_str());
         return rc;
     }
 
@@ -43,7 +43,7 @@ RC RecordBasedFileManager::destroyFile(const string &fileName) {
 RC RecordBasedFileManager::openFile(const string &fileName, FileHandle &fileHandle) {
     RC rc;
     if((rc = this->pfm->openFile(fileName, fileHandle)) != 0){
-        perror("PagedFileManager API call: openFile failed");
+        eprintf("PagedFileManager API call: openFile failed on file %s", fileName.c_str());
         return rc;
     }
 
@@ -53,7 +53,7 @@ RC RecordBasedFileManager::openFile(const string &fileName, FileHandle &fileHand
 RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
     RC rc;
     if((rc = this->pfm->closeFile(fileHandle)) != 0){
-        perror("PagedFileManager API call: closeFile failed");
+        eprintf("PagedFileManager API call: closeFile failed");
         return rc;
     }
 
