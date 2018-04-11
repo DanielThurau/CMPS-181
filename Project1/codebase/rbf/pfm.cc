@@ -105,7 +105,19 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
 
 RC FileHandle::appendPage(const void *data)
 {
-    return -1;
+    if (fp == NULL) {
+        cerr << "appendPage: no file attached to FileHandle";
+    }
+    if (fseek(fp, 0L, SEEK_END) != 0) {
+        perror("appendPage: seek failed");
+        return -1;
+    }
+    if (fwrite(data, 1, PAGE_SIZE, fp) != 0) {
+        perror("appendPage: write failed");
+        return -2;
+    }
+    appendPageCounter++;
+    return 0;
 }
 
 
