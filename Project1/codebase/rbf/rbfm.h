@@ -70,6 +70,9 @@ public:
 class RecordBasedFileManager
 {
 public:
+
+  PagedFileManager *pfm;
+
   static RecordBasedFileManager* instance();
 
   RC createFile(const string &fileName);
