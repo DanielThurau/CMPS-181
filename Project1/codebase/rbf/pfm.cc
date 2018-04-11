@@ -1,6 +1,7 @@
 #include <stdio.h>
-#include <iostream>
 #include "pfm.h"
+
+#define eprintf(...) fprintf (stderr, __VA_ARGS__)
 
 PagedFileManager* PagedFileManager::_pf_manager = 0;
 
@@ -26,7 +27,7 @@ PagedFileManager::~PagedFileManager()
 RC PagedFileManager::createFile(const string &fileName)
 {
     if (fopen(fileName.c_str(), "r") != nullptr) {
-        cerr << "createFile: file " << fileName << " already exists" << endl;
+        eprintf("createFile: file %s already exists\n", fileName.c_str());
         return -1;
     }
     FILE* newFile = fopen(fileName.c_str(), "w");
@@ -68,7 +69,7 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 RC PagedFileManager::closeFile(FileHandle &fileHandle)
 {
     if (fileHandle.fp == NULL) {
-        cerr << "closeFile: fileHandle has not opened a file";
+        eprintf("closeFile: fileHandle has not opened a file");
         return -1;
     }
     fclose(fileHandle.fp);
@@ -93,33 +94,38 @@ FileHandle::~FileHandle()
 
 RC FileHandle::readPage(PageNum pageNum, void *data)
 {
-
     // If page doesn't exist, return error.
     if(pageNum < 0 || pageNum > getNumberOfPages()){
         perror("Unable to read page " + pageNum);
         return -1;
     }
-
-
-
-    readPageCounter++;
+    if(fseek(this->fp, pageNum * PAGE_SIZE, SEEK_SET) != 0) {
+        perror("readPage: seek failed");
+        return -2;
+    }
+    if(fread(data, 1, PAGE_SIZE, this->fp) != PAGE_SIZE) {
+        perror("readPage: read failed");
+        return -3;
+    }
+    this->readPageCounter++;
     return 0;
-
 }
 
 
 RC FileHandle::writePage(PageNum pageNum, const void *data)
 {
-    if(fseek(fp, pageNum*PAGE_SIZE, SEEK_SET) != 0){
-        perror("FileHandle::writePage page: does not exist");
+    if(fseek(this->fp, pageNum * PAGE_SIZE, SEEK_SET) != 0){
+        perror("writePage: seek failed");
         return -1;
     }
-
     if(fwrite(data, PAGE_SIZE, PAGE_SIZE, this->fp) != PAGE_SIZE){
-        perror("FileHandle::writePage page: could not write page");
+        perror("writePage: write failed");
         return -2;
     }
-
+    if(fflush(this->fp) != 0) {
+        perror("writePage: flush failed");
+        return -3;
+    }
     this->writePageCounter++;
     return 0;
 }
@@ -127,41 +133,44 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
 
 RC FileHandle::appendPage(const void *data)
 {
-    if (fp == NULL) {
-        cerr << "appendPage: no file attached to FileHandle";
+    if (this->fp == NULL) {
+        eprintf("appendPage: no file attached to FileHandle");
     }
-    if (fseek(fp, 0L, SEEK_END) != 0) {
+    if (fseek(this->fp, 0L, SEEK_END) != 0) {
         perror("appendPage: seek failed");
         return -1;
     }
-    if (fwrite(data, 1, PAGE_SIZE, fp) != PAGE_SIZE) {
+    if (fwrite(data, 1, PAGE_SIZE, this->fp) != PAGE_SIZE) {
         perror("appendPage: write failed");
         return -2;
     }
-    appendPageCounter++;
+    if(fflush(this->fp) != 0) {
+        perror("appendPage: flush failed");
+        return -3;
+    }
+    this->appendPageCounter++;
     return 0;
 }
 
 
 unsigned FileHandle::getNumberOfPages()
 {
+    unsigned fileSize;
 
-    unsigned numPages, fileSize;
-
-    fseek(fp, 0L, SEEK_END);
-    fileSize = ftell(fp);
+    fseek(this->fp, 0L, SEEK_END);
+    fileSize = ftell(this->fp);
     if(fileSize < 0){
-        perror("Could not read number of pages.");
+        perror("getNumberOfPages: could not read number of pages");
         return -1;
     }
-    
-    numPages = fileSize / PAGE_SIZE;
-    return numPages;
-
+    return fileSize / PAGE_SIZE;
 }
 
 
 RC FileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
 {
-	return -1;
+    readPageCount = this->readPageCounter;
+    writePageCount = this->writePageCounter;
+    appendPageCount = this->appendPageCounter;
+    return 0;
 }
