@@ -25,12 +25,12 @@ PagedFileManager::~PagedFileManager()
 
 RC PagedFileManager::createFile(const string &fileName)
 {
-    if (fopen(fileName.c_str(), "w") != NULL) {
+    if (fopen(fileName.c_str(), "r") != nullptr) {
         cerr << "createFile: file " << fileName << " already exists" << endl;
         return -1;
     }
     FILE* newFile = fopen(fileName.c_str(), "w");
-    if (newFile == NULL) {
+    if (newFile == nullptr) {
         perror("createFile: file creation failed");
         return -2;
     }
@@ -51,17 +51,17 @@ RC PagedFileManager::destroyFile(const string &fileName)
 
 RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 {
-    if(fileHandle.fp == NULL){
-        perror("fileHandle already handle for file");
+    if(fileHandle.fp != NULL){
+        perror("openFile: FileHandle already has a file");
         return -1;
     }
 
     if((fileHandle.fp = fopen(fileName.c_str(), "rwa+")) == nullptr){
-        perror("fileHandle: could not open file");
-        return -1;
+        perror("openFile: could not open file");
+        return -2;
     } 
 
-    return 1;
+    return 0;
 }
 
 
@@ -110,14 +110,14 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
 
 RC FileHandle::writePage(PageNum pageNum, const void *data)
 {
-    if(fseek(this->fp, pageNum*PAGE_SIZE, SEEK_SET) != 0){
+    if(fseek(fp, pageNum*PAGE_SIZE, SEEK_SET) != 0){
         perror("FileHandle::writePage page: does not exist");
         return -1;
     }
 
     if(fwrite(data, PAGE_SIZE, PAGE_SIZE, this->fp) != PAGE_SIZE){
         perror("FileHandle::writePage page: could not write page");
-        return -1;
+        return -2;
     }
 
     this->writePageCounter++;
@@ -134,7 +134,7 @@ RC FileHandle::appendPage(const void *data)
         perror("appendPage: seek failed");
         return -1;
     }
-    if (fwrite(data, 1, PAGE_SIZE, fp) != 0) {
+    if (fwrite(data, 1, PAGE_SIZE, fp) != PAGE_SIZE) {
         perror("appendPage: write failed");
         return -2;
     }
@@ -148,7 +148,7 @@ unsigned FileHandle::getNumberOfPages()
 
     unsigned numPages, fileSize;
 
-    fseek(fp, 0, SEEK_END);
+    fseek(fp, 0L, SEEK_END);
     fileSize = ftell(fp);
     if(fileSize < 0){
         perror("Could not read number of pages.");
