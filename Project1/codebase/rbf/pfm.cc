@@ -99,7 +99,18 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
 
 RC FileHandle::writePage(PageNum pageNum, const void *data)
 {
-    return -1;
+    if(fseek(this->fp, pageNum*PAGE_SIZE, SEEK_SET) != 0){
+        perror("FileHandle::writePage page: does not exist");
+        return -1;
+    }
+
+    if(fwrite(data, PAGE_SIZE, PAGE_SIZE, this->fp) != PAGE_SIZE){
+        perror("FileHandle::writePage page: could not write page");
+        return -1;
+    }
+
+    this->writePageCounter++;
+    return 0;
 }
 
 
