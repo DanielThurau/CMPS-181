@@ -62,7 +62,7 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
     unsigned recordLength = 0;
-    for (int i = 0; i < recordDescriptor.size(); i++) {
+    for (size_t i = 0; i < recordDescriptor.size(); i++) {
         // art
         bool attrNull = (128 >> (i % 8)) & *((uint8_t*)data + i / 8);
         if (!attrNull) {
@@ -78,5 +78,44 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
 }
 
 RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
-    return -1;
+    // number of bytes for null flag
+    int numNullBytes = ceil(recordDescriptor.size() / 8.0);
+    // pointer to current field
+    uint8_t *curField = (uint8_t*) data + numNullBytes;
+
+    for (size_t i = 0; i < recordDescriptor.size(); i++) {
+        printf("%s: ", recordDescriptor[i].name.c_str());
+        // if null flag is set for this field, print NULL and continue
+        if ((128 >> (i % 8)) & *((uint8_t*) data + i / 8)) {
+            printf("NULL    ");
+            continue;
+        }
+
+        if (recordDescriptor[i].type == TypeInt) {
+            printf("%-8d", *((int*)curField));
+            curField += recordDescriptor[i].length;
+        }
+        else if (recordDescriptor[i].type == TypeReal) {
+            printf("%-8f", *((float*)curField));
+            curField += recordDescriptor[i].length;
+        }
+        else {
+            // first 4 bytes of varchar is length 
+            unsigned stringLength = *((unsigned*) curField);
+            curField += 4;
+            // print each char in string one by one
+            for (unsigned j = 0; j < stringLength; j++) {
+                putchar(*(curField + j));
+            }
+            curField += stringLength;
+        }
+
+        // add a space between fields
+        if (i < recordDescriptor.size() - 1) {
+            printf(" ");
+        }
+
+    }
+    printf("\n");
+    return 0;
 }
