@@ -99,7 +99,7 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
             printf("%-8f", *((float*)curField));
             curField += recordDescriptor[i].length;
         }
-        else {
+        else if (recordDescriptor[i].type == TypeVarChar) {
             // first 4 bytes of varchar is length 
             unsigned stringLength = *((unsigned*) curField);
             curField += 4;
