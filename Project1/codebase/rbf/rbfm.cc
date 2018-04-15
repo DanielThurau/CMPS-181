@@ -61,20 +61,56 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
-    unsigned recordLength = 0;
-    for (size_t i = 0; i < recordDescriptor.size(); i++) {
-        // art
-        bool attrNull = (128 >> (i % 8)) & *((uint8_t*)data + i / 8);
-        if (!attrNull) {
-            recordLength += recordDescriptor[i].length;
-        }
+    unsigned recordLength;
+    getRecordLength(recordDescriptor, data, recordLength);
+    printf("%u\n", recordLength);
+
+    void *data2 = malloc(PAGE_SIZE);
+    createNewPage(data2);
+    for (int i = 0; i < PAGE_SIZE / 4; i++) {
+        printf("%u ", *((unsigned*) data2 + i));
     }
+    printf("\n");
 
     return -1;
 }
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     return -1;
+}
+
+RC RecordBasedFileManager::getRecordLength(const vector<Attribute> & recordDescriptor, const void *data, unsigned &recordLength) {
+    // number of bytes for null flag
+    int numNullBytes = ceil(recordDescriptor.size() / 8.0);
+    // pointer to current field
+    uint8_t *curField = (uint8_t*) data + numNullBytes;
+
+    for (size_t i = 0; i < recordDescriptor.size(); i++) {
+        // if null flag is set for this field, continue
+        if ((128 >> (i % 8)) & *((uint8_t*) data + i / 8)) {
+            continue;
+        }
+
+        if (recordDescriptor[i].type == TypeInt || recordDescriptor[i].type == TypeReal) {
+            curField += recordDescriptor[i].length;
+        }
+        else if (recordDescriptor[i].type == TypeVarChar) {
+            // first 4 bytes of varchar is length 
+            unsigned stringLength = *((unsigned*) curField);
+            curField += stringLength + 4;
+        }
+    }
+    recordLength = (unsigned) (curField - (uint8_t*)data);
+    return 0;
+}
+
+RC RecordBasedFileManager::createNewPage(void *data) {
+    // write 0 to last 4 bytes of data for offset to start of free space
+    *((unsigned*) data + (PAGE_SIZE / 4) - 1) = 0;
+    // write 0 to second-to-last 4 bytes of data for num of slots
+    *((unsigned*) data + (PAGE_SIZE / 4) - 2) = 0;
+
+    return 0;
 }
 
 RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
@@ -87,16 +123,16 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
         printf("%s: ", recordDescriptor[i].name.c_str());
         // if null flag is set for this field, print NULL and continue
         if ((128 >> (i % 8)) & *((uint8_t*) data + i / 8)) {
-            printf("NULL    ");
+            printf("NULL");
             continue;
         }
 
         if (recordDescriptor[i].type == TypeInt) {
-            printf("%-8d", *((int*)curField));
+            printf("%d", *((int*)curField));
             curField += recordDescriptor[i].length;
         }
         else if (recordDescriptor[i].type == TypeReal) {
-            printf("%-8f", *((float*)curField));
+            printf("%f", *((float*)curField));
             curField += recordDescriptor[i].length;
         }
         else if (recordDescriptor[i].type == TypeVarChar) {
