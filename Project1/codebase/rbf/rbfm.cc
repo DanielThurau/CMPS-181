@@ -65,12 +65,20 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     getRecordLength(recordDescriptor, data, recordLength);
     printf("%u\n", recordLength);
 
+    /*
     void *data2 = malloc(PAGE_SIZE);
     createNewPage(data2);
     for (int i = 0; i < PAGE_SIZE / 4; i++) {
         printf("%u ", *((unsigned*) data2 + i));
     }
     printf("\n");
+
+    unsigned size;
+    getAvailableSpaceInPage(data2, size);
+    printf("%u\n", size);
+    */
+
+
 
     return -1;
 }
@@ -110,6 +118,56 @@ RC RecordBasedFileManager::createNewPage(void *data) {
     // write 0 to second-to-last 4 bytes of data for num of slots
     *((unsigned*) data + (PAGE_SIZE / 4) - 2) = 0;
 
+    return 0;
+}
+
+RC RecordBasedFileManager::getAvailableSpaceInPage(const void *data, unsigned &space) {
+    unsigned freeSpaceOffset = *((unsigned*) data + (PAGE_SIZE / 4) - 1);
+    unsigned numRecords = *((unsigned*) data + (PAGE_SIZE / 4) - 1);
+    space = PAGE_SIZE - freeSpaceOffset - 8 - (numRecords + 1) * 8;
+
+    return 0;
+}
+
+RC RecordBasedFileManager::getNextPage(FileHandle &fileHandle, unsigned recordLength, unsigned &pageNum) {
+    unsigned numPages = fileHandle.getNumberOfPages();
+    void* data = malloc(PAGE_SIZE);
+
+    // Check if the first page is empty. If so, append there.
+    if (numPages == 0) {
+        createNewPage(data);
+        fileHandle.appendPage(data);
+        pageNum = ++numPages;
+        free(data);
+        return 0;
+    }
+    
+    // Check if any pages in the file are empty. If so, append there.
+    fileHandle.readPage(numPages - 1, data);
+    unsigned space;
+    getAvailableSpaceInPage(data, space);
+    if(space >= recordLength){
+        pageNum = numPages - 1;
+        free(data);
+        return 0;
+    }
+
+    // Check if any of the files have empty space. If so, append there.
+    for(unsigned pg_offset = 0; pg_offset < numPages - 1; pg_offset++){
+        fileHandle.readPage(pg_offset, data);
+        getAvailableSpaceInPage(data, space);
+        if(space >= recordLength){
+            pageNum = pg_offset;
+            free(data);
+            return 0;
+        }
+    }
+
+    // If all else fails, just append to the end.
+    createNewPage(data);
+    fileHandle.appendPage(data);
+    pageNum = ++numPages;
+    free(data);
     return 0;
 }
 
