@@ -1,4 +1,3 @@
-#include <math.h>
 #include "rbfm.h"
 
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = 0;
@@ -65,22 +64,18 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     getRecordLength(recordDescriptor, data, recordLength);
     printf("%u\n", recordLength);
 
-    /*
-    void *data2 = malloc(PAGE_SIZE);
-    createNewPage(data2);
-    for (int i = 0; i < PAGE_SIZE / 4; i++) {
-        printf("%u ", *((unsigned*) data2 + i));
-    }
-    printf("\n");
+    unsigned pageNum;
+    getNextPage(fileHandle, recordLength, pageNum);
+    printf("pageNum: %u\n", pageNum);
 
-    unsigned size;
-    getAvailableSpaceInPage(data2, size);
-    printf("%u\n", size);
-    */
+    unsigned sid;
+    writeRecord(fileHandle, recordLength, pageNum, data, sid);
+    printf("sid: %u\n", sid);
 
+    rid.pageNum = pageNum;
+    rid.slotNum = sid;
 
-
-    return -1;
+    return 0;
 }
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
@@ -123,9 +118,32 @@ RC RecordBasedFileManager::createNewPage(void *data) {
 
 RC RecordBasedFileManager::getAvailableSpaceInPage(const void *data, unsigned &space) {
     unsigned freeSpaceOffset = *((unsigned*) data + (PAGE_SIZE / 4) - 1);
-    unsigned numRecords = *((unsigned*) data + (PAGE_SIZE / 4) - 1);
+    unsigned numRecords = *((unsigned*) data + (PAGE_SIZE / 4) - 2);
     space = PAGE_SIZE - freeSpaceOffset - 8 - (numRecords + 1) * 8;
 
+    return 0;
+}
+
+RC RecordBasedFileManager::writeRecord(FileHandle &fileHandle, unsigned recordLength, unsigned pageNum, const void *data, unsigned &sid) {
+    void *page = malloc(PAGE_SIZE);
+    fileHandle.readPage(pageNum, page);
+
+    unsigned freeSpaceOffset = *((unsigned*) page + (PAGE_SIZE / 4) - 1);
+    unsigned numRecords = *((unsigned*) page + (PAGE_SIZE / 4) - 2);
+
+    memcpy((uint8_t*)page + freeSpaceOffset, data, recordLength);
+
+    *((unsigned*)page + PAGE_SIZE / 4 - 2 - (numRecords + 1) * 2) = freeSpaceOffset;
+    *((unsigned*)page + PAGE_SIZE / 4 - 2 - (numRecords + 1) * 2 + 1) = recordLength;
+
+    sid = numRecords;
+
+    *((unsigned*) page + (PAGE_SIZE / 4) - 2) = numRecords + 1;
+    *((unsigned*) page + (PAGE_SIZE / 4) - 1) = freeSpaceOffset + recordLength;
+
+    fileHandle.writePage(pageNum, page);
+
+    free(page);
     return 0;
 }
 
@@ -137,7 +155,7 @@ RC RecordBasedFileManager::getNextPage(FileHandle &fileHandle, unsigned recordLe
     if (numPages == 0) {
         createNewPage(data);
         fileHandle.appendPage(data);
-        pageNum = ++numPages;
+        pageNum = 0;
         free(data);
         return 0;
     }

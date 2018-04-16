@@ -2,6 +2,8 @@
 #define _rbfm_h_
 
 #include <string>
+#include <string.h>
+#include <math.h>
 #include <vector>
 #include <climits>
 
@@ -137,6 +139,7 @@ private:
   RC createNewPage(void *data);
   RC getAvailableSpaceInPage(const void *data, unsigned &space);
   RC getNextPage(FileHandle &fileHandle, unsigned recordLength, unsigned &pageNum);
+  RC writeRecord(FileHandle &fileHandle, unsigned recordLength, unsigned pageNum, const void *data, unsigned &sid); 
 };
 
 #endif
