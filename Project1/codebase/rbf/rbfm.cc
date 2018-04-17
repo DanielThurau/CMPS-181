@@ -62,15 +62,12 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
     unsigned recordLength;
     getRecordLength(recordDescriptor, data, recordLength);
-    printf("%u\n", recordLength);
 
     unsigned pageNum;
     getNextPage(fileHandle, recordLength, pageNum);
-    printf("pageNum: %u\n", pageNum);
 
     unsigned sid;
     writeRecord(fileHandle, recordLength, pageNum, data, sid);
-    printf("sid: %u\n", sid);
 
     rid.pageNum = pageNum;
     rid.slotNum = sid;
@@ -81,9 +78,10 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     void *page = malloc(PAGE_SIZE);
     fileHandle.readPage(rid.pageNum, page);
+    unsigned *pageUnsigned = (unsigned*) page;
 
-    unsigned recordSize = *((unsigned*) page + PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2 + 1);
-    unsigned offset = *((unsigned*) page + PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2);
+    unsigned recordSize = pageUnsigned[PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2 + 1];
+    unsigned offset = pageUnsigned[PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2];
 
     memcpy(data, (uint8_t*) page + offset, recordSize);
 
@@ -91,6 +89,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     return 0;
 }
 
+// gets the length of a record
 RC RecordBasedFileManager::getRecordLength(const vector<Attribute> & recordDescriptor, const void *data, unsigned &recordLength) {
     // number of bytes for null flag
     int numNullBytes = ceil(recordDescriptor.size() / 8.0);
@@ -116,39 +115,58 @@ RC RecordBasedFileManager::getRecordLength(const vector<Attribute> & recordDescr
     return 0;
 }
 
+// initializes a page to be used to store records
 RC RecordBasedFileManager::createNewPage(void *data) {
+    unsigned *pageUnsigned = (unsigned*) data;
+
     // write 0 to last 4 bytes of data for offset to start of free space
-    *((unsigned*) data + (PAGE_SIZE / 4) - 1) = 0;
+    pageUnsigned[PAGE_SIZE / 4 - 1] = 0;
     // write 0 to second-to-last 4 bytes of data for num of slots
-    *((unsigned*) data + (PAGE_SIZE / 4) - 2) = 0;
+    pageUnsigned[PAGE_SIZE / 4 - 2] = 0;
 
     return 0;
 }
 
+// gets the amount of space left in a page
 RC RecordBasedFileManager::getAvailableSpaceInPage(const void *data, unsigned &space) {
-    unsigned freeSpaceOffset = *((unsigned*) data + (PAGE_SIZE / 4) - 1);
-    unsigned numRecords = *((unsigned*) data + (PAGE_SIZE / 4) - 2);
-    space = PAGE_SIZE - freeSpaceOffset - 8 - numRecords * 8;
+    unsigned *pageUnsigned = (unsigned*) data;
 
+    // get offset to start of free space from last 4 bytes of page
+    unsigned freeSpaceOffset = pageUnsigned[PAGE_SIZE / 4 - 1];
+    // get number of records from second-to-last 4 bytes of page
+    unsigned numRecords = pageUnsigned[PAGE_SIZE / 4 - 2];
+
+    // remaining free space in page is page size - space occupied by records - 8 bytes for offset and num records
+    // - 8 bytes per record for record directory
+    space = PAGE_SIZE - freeSpaceOffset - 8 - numRecords * 8;
     return 0;
 }
 
+// writes a record into a page
+// given the page number, the length of the record and a pointer to the record
+// returns the slot id the record is given
 RC RecordBasedFileManager::writeRecord(FileHandle &fileHandle, unsigned recordLength, unsigned pageNum, const void *data, unsigned &sid) {
     void *page = malloc(PAGE_SIZE);
     fileHandle.readPage(pageNum, page);
+    unsigned *pageUnsigned = (unsigned*) page;
 
-    unsigned freeSpaceOffset = *((unsigned*) page + (PAGE_SIZE / 4) - 1);
-    unsigned numRecords = *((unsigned*) page + (PAGE_SIZE / 4) - 2);
+    // get offset to free space and number of records from end of page
+    unsigned freeSpaceOffset = pageUnsigned[PAGE_SIZE / 4 - 1];
+    unsigned numRecords = pageUnsigned[PAGE_SIZE / 4 - 2];
 
+    // copy record into page starting at free space offset
     memcpy((uint8_t*)page + freeSpaceOffset, data, recordLength);
 
-    *((unsigned*) page + PAGE_SIZE / 4 - 2 - (numRecords + 1) * 2) = freeSpaceOffset;
-    *((unsigned*) page + PAGE_SIZE / 4 - 2 - (numRecords + 1) * 2 + 1) = recordLength;
+    // add new record offset and length to record directory
+    pageUnsigned[PAGE_SIZE / 4 - 2 - numRecords * 2 - 2] = freeSpaceOffset;
+    pageUnsigned[PAGE_SIZE / 4 - 2 - numRecords * 2 - 1] = recordLength;
 
+    // return slot id
     sid = numRecords;
 
-    *((unsigned*) page + (PAGE_SIZE / 4) - 2) = numRecords + 1;
-    *((unsigned*) page + (PAGE_SIZE / 4) - 1) = freeSpaceOffset + recordLength;
+    // update number of records and offset to free space in page
+    pageUnsigned[PAGE_SIZE / 4 - 2] = numRecords + 1;
+    pageUnsigned[PAGE_SIZE / 4 - 1] = freeSpaceOffset + recordLength;
 
     fileHandle.writePage(pageNum, page);
 
@@ -156,30 +174,24 @@ RC RecordBasedFileManager::writeRecord(FileHandle &fileHandle, unsigned recordLe
     return 0;
 }
 
+// gets the next page with enough space available to store a record of length recordLength
 RC RecordBasedFileManager::getNextPage(FileHandle &fileHandle, unsigned recordLength, unsigned &pageNum) {
     unsigned numPages = fileHandle.getNumberOfPages();
     void* data = malloc(PAGE_SIZE);
-
-    // Check if the first page is empty. If so, append there.
-    if (numPages == 0) {
-        createNewPage(data);
-        fileHandle.appendPage(data);
-        pageNum = 0;
-        free(data);
-        return 0;
-    }
-    
-    // Check if any pages in the file are empty. If so, append there.
-    fileHandle.readPage(numPages - 1, data);
     unsigned space;
-    getAvailableSpaceInPage(data, space);
-    if(space >= recordLength + 8){
-        pageNum = numPages - 1;
-        free(data);
-        return 0;
+
+    // check the last page
+    if (numPages > 0) {
+        fileHandle.readPage(numPages - 1, data);
+        getAvailableSpaceInPage(data, space);
+        if(space >= recordLength + 8){
+            pageNum = numPages - 1;
+            free(data);
+            return 0;
+        }
     }
 
-    // Check if any of the files have empty space. If so, append there.
+    // if the last page doesn't have space, check all the other pages
     for(unsigned pg_offset = 0; pg_offset < numPages - 1; pg_offset++){
         fileHandle.readPage(pg_offset, data);
         getAvailableSpaceInPage(data, space);
@@ -190,7 +202,7 @@ RC RecordBasedFileManager::getNextPage(FileHandle &fileHandle, unsigned recordLe
         }
     }
 
-    // If all else fails, just append to the end.
+    // if no pages have space, append a new page
     createNewPage(data);
     fileHandle.appendPage(data);
     pageNum = ++numPages;
@@ -213,11 +225,11 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
         }
 
         if (recordDescriptor[i].type == TypeInt) {
-            printf("%d", *((int*)curField));
+            printf("%d", *((int*) curField));
             curField += recordDescriptor[i].length;
         }
         else if (recordDescriptor[i].type == TypeReal) {
-            printf("%f", *((float*)curField));
+            printf("%f", *((float*) curField));
             curField += recordDescriptor[i].length;
         }
         else if (recordDescriptor[i].type == TypeVarChar) {
@@ -226,7 +238,7 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
             curField += 4;
             // print each char in string one by one
             for (unsigned j = 0; j < stringLength; j++) {
-                putchar(*(curField + j));
+                putchar(curField[j]);
             }
             curField += stringLength;
         }
