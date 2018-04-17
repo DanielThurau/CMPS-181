@@ -1,18 +1,26 @@
 1. Basic information
 Team number:
-Student ID of submitter: 
-Student Name of submitter: 
-Other Team Members:
+Student ID of submitter: mlgrant
+Student Name of submitter: Morgan Grant
+Other Team Members: Preston Fraser, Daniel Thurau
 
 
 2. Internal Record Format
-- Show your record format design and describe how your design satisfies O(1) field access. If not, just mention that you haven't implemented this feature.
-- Describe how you store a VarChar field.
+- Show your record format design and describe how your design satisfies O(1) field access.
+If not, just mention that you haven't implemented this feature.
 
+
+- Describe how you store a VarChar field.
+We store a VarChar field in two components, as specified: 4 bytes to store the length of
+the characters, then the list of characters stored.
 
 3. Page Format
-- Show your page format design
-
+Our page format has a slot directory at the back which, starting from the back, contains an
+offset to the start of the free space (4 bytes), the number of slots in use (4 bytes), and
+then an offset (4 bytes) and record length (4 bytes) for each slot being used in the page.
+The actual records are stored at the front and back of the page, growing towards the middle
+as insertions are made. The free space is stored between the growing list of records on
+either side.
 
 4. Implementation Detail
 - Other implementation details goes here.
