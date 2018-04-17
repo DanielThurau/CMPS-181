@@ -60,9 +60,20 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
+    
+
     unsigned recordLength;
     getRecordLength(recordDescriptor, data, recordLength);
 
+    void* newData = malloc(recordLength + recordDescriptor.size() * 2);
+    addDirectoryToRecord(recordDescriptor, data, newData);
+
+    for (unsigned i = 0; i < recordLength + recordDescriptor.size() * 2; i++) {
+        printf("%u ", ((uint8_t*)newData)[i]);
+    }
+    printf("\n");
+
+/*
     unsigned pageNum;
     getNextPage(fileHandle, recordLength, pageNum);
 
@@ -71,7 +82,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 
     rid.pageNum = pageNum;
     rid.slotNum = sid;
-
+ */
     return 0;
 }
 
@@ -86,6 +97,44 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     memcpy(data, (uint8_t*) page + offset, recordSize);
 
     free(page);
+    return 0;
+}
+
+RC RecordBasedFileManager::addDirectoryToRecord(const vector<Attribute> &recordDescriptor, const void *dataIn, void *dataOut) {
+    int numNullBytes = ceil(recordDescriptor.size() / 8.0);
+    memcpy(dataOut, dataIn, numNullBytes);
+    // pointer to start of field pointer directory in reformatted record
+    unsigned short *curFieldPointer = (unsigned short *)((uint8_t*) dataOut + numNullBytes);
+
+    // pointer to current field in old record
+    uint8_t *curField = (uint8_t*) dataIn + numNullBytes;
+    // pointer to start of fields in old record
+    uint8_t *startOfFields = curField;
+
+    for (size_t i = 0; i < recordDescriptor.size(); i++) {
+        // if null flag is set for this field, continue
+        if ((128 >> (i % 8)) & *((uint8_t*) dataIn + i / 8)) {
+            *curFieldPointer = (unsigned short)(curField - startOfFields);
+            curFieldPointer++;
+            continue;
+        }
+
+        if (recordDescriptor[i].type == TypeInt || recordDescriptor[i].type == TypeReal) {
+            curField += recordDescriptor[i].length;
+            *curFieldPointer = (unsigned short)(curField - startOfFields);
+            curFieldPointer++;
+        }
+        else if (recordDescriptor[i].type == TypeVarChar) {
+            // first 4 bytes of varchar is length 
+            unsigned stringLength = *((unsigned*) curField);
+            curField += stringLength + 4;
+            *curFieldPointer = (unsigned short)(curField - startOfFields);
+            curFieldPointer++;
+        }
+    }
+
+    int fieldsSize = curField - startOfFields;
+    memcpy(curFieldPointer, startOfFields, fieldsSize);
     return 0;
 }
 

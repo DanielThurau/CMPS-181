@@ -135,11 +135,12 @@ protected:
 
 private:
   static RecordBasedFileManager *_rbf_manager;
-  RC getRecordLength(const vector<Attribute> & recordDescriptor, const void *data, unsigned &recordLength);
+  RC getRecordLength(const vector<Attribute> &recordDescriptor, const void *data, unsigned &recordLength);
   RC createNewPage(void *data);
   RC getAvailableSpaceInPage(const void *data, unsigned &space);
   RC getNextPage(FileHandle &fileHandle, unsigned recordLength, unsigned &pageNum);
   RC writeRecord(FileHandle &fileHandle, unsigned recordLength, unsigned pageNum, const void *data, unsigned &sid); 
+  RC addDirectoryToRecord(const vector<Attribute> &recordDescriptor, const void *dataIn, void *dataOut);
 };
 
 #endif
