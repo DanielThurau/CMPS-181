@@ -141,6 +141,7 @@ private:
   RC getNextPage(FileHandle &fileHandle, unsigned recordLength, unsigned &pageNum);
   RC writeRecord(FileHandle &fileHandle, unsigned recordLength, unsigned pageNum, const void *data, unsigned &sid); 
   RC addDirectoryToRecord(const vector<Attribute> &recordDescriptor, const void *dataIn, void *dataOut);
+  RC removeDirectoryFromRecord(const vector<Attribute> &recordDescriptor, unsigned recordSize, void *dataIn, void *dataOut);
 };
 
 #endif

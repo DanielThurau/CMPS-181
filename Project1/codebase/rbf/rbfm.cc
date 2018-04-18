@@ -60,29 +60,29 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
-    
-
     unsigned recordLength;
     getRecordLength(recordDescriptor, data, recordLength);
+    // size of record after adding field directory is size of old record + 2 bytes for each field
+    unsigned recordLengthWithFieldDirectory = recordLength + recordDescriptor.size() * 2;
 
-    void* newData = malloc(recordLength + recordDescriptor.size() * 2);
-    addDirectoryToRecord(recordDescriptor, data, newData);
+    // add field directory to record
+    void* recordWithFieldDirectory = malloc(recordLengthWithFieldDirectory * 2);
+    addDirectoryToRecord(recordDescriptor, data, recordWithFieldDirectory);
 
-    for (unsigned i = 0; i < recordLength + recordDescriptor.size() * 2; i++) {
-        printf("%u ", ((uint8_t*)newData)[i]);
-    }
-    printf("\n");
-
-/*
+    // get the next page with enough space to hold the record
     unsigned pageNum;
-    getNextPage(fileHandle, recordLength, pageNum);
+    getNextPage(fileHandle, recordLengthWithFieldDirectory, pageNum);
 
+    // write the record to the page
     unsigned sid;
-    writeRecord(fileHandle, recordLength, pageNum, data, sid);
+    writeRecord(fileHandle, recordLengthWithFieldDirectory, pageNum, recordWithFieldDirectory, sid);
 
+    // return rid
     rid.pageNum = pageNum;
     rid.slotNum = sid;
- */
+ 
+    free(recordWithFieldDirectory);
+
     return 0;
 }
 
@@ -94,15 +94,20 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     unsigned recordSize = pageUnsigned[PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2 + 1];
     unsigned offset = pageUnsigned[PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2];
 
-    memcpy(data, (uint8_t*) page + offset, recordSize);
+    void *recordWithDirectory = malloc(recordSize);
+    memcpy(recordWithDirectory, (uint8_t*) page + offset, recordSize);
+    removeDirectoryFromRecord(recordDescriptor, recordSize, recordWithDirectory, data);
 
+    free(recordWithDirectory);
     free(page);
     return 0;
 }
 
+// add a field directory to a record to allow O(1) field access time
 RC RecordBasedFileManager::addDirectoryToRecord(const vector<Attribute> &recordDescriptor, const void *dataIn, void *dataOut) {
     int numNullBytes = ceil(recordDescriptor.size() / 8.0);
     memcpy(dataOut, dataIn, numNullBytes);
+
     // pointer to start of field pointer directory in reformatted record
     unsigned short *curFieldPointer = (unsigned short *)((uint8_t*) dataOut + numNullBytes);
 
@@ -112,8 +117,8 @@ RC RecordBasedFileManager::addDirectoryToRecord(const vector<Attribute> &recordD
     uint8_t *startOfFields = curField;
 
     for (size_t i = 0; i < recordDescriptor.size(); i++) {
-        // if null flag is set for this field, continue
-        if ((128 >> (i % 8)) & *((uint8_t*) dataIn + i / 8)) {
+        // if null flag is set for this field, don't increment curFieldPointer before adding offset to directory
+        if ((128 >> (i % 8)) & ((uint8_t*) dataIn)[i / 8]) {
             *curFieldPointer = (unsigned short)(curField - startOfFields);
             curFieldPointer++;
             continue;
@@ -133,8 +138,19 @@ RC RecordBasedFileManager::addDirectoryToRecord(const vector<Attribute> &recordD
         }
     }
 
+    // after looping through all fields, curField points to end of field
+    // get size of fields by subtracting pointer to start of fields from curField
     int fieldsSize = curField - startOfFields;
+    // add fields to end of reformatted record
     memcpy(curFieldPointer, startOfFields, fieldsSize);
+    return 0;
+}
+
+RC RecordBasedFileManager::removeDirectoryFromRecord(const vector<Attribute> &recordDescriptor, unsigned recordSize, void *dataIn, void *dataOut) {
+    int numNullBytes = ceil(recordDescriptor.size() / 8.0);
+    int numDirectoryBytes = recordDescriptor.size() * 2;
+    memcpy(dataOut, dataIn, numNullBytes);
+    memcpy((uint8_t*) dataOut + numNullBytes, (uint8_t*) dataIn + numNullBytes + numDirectoryBytes, recordSize - numNullBytes - numDirectoryBytes);
     return 0;
 }
 
