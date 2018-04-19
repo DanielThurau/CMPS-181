@@ -67,15 +67,26 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 
     // add field directory to record
     void* recordWithFieldDirectory = malloc(recordLengthWithFieldDirectory * 2);
+    if (recordWithFieldDirectory == nullptr) {
+        eprintf("insertRecord: malloc failed\n");
+        return -1;
+    }
+
     addDirectoryToRecord(recordDescriptor, data, recordWithFieldDirectory);
 
     // get the next page with enough space to hold the record
     unsigned pageNum;
-    getNextPage(fileHandle, recordLengthWithFieldDirectory, pageNum);
+    if (getNextPage(fileHandle, recordLengthWithFieldDirectory, pageNum) != 0) {
+        eprintf("insertRecord: getNextPage failed\n");
+        return -2;
+    }
 
     // write the record to the page
     unsigned sid;
-    writeRecord(fileHandle, recordLengthWithFieldDirectory, pageNum, recordWithFieldDirectory, sid);
+    if (writeRecord(fileHandle, recordLengthWithFieldDirectory, pageNum, recordWithFieldDirectory, sid) != 0) {
+        eprintf("insertRecord: writeRecord failed\n");
+        return -3;
+    }
 
     // return rid
     rid.pageNum = pageNum;
@@ -88,13 +99,27 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     void *page = malloc(PAGE_SIZE);
-    fileHandle.readPage(rid.pageNum, page);
+    if (page == nullptr) {
+        eprintf("readRecord: malloc failed\n");
+        return -1;
+    }
+
+    if (fileHandle.readPage(rid.pageNum, page) != 0) {
+        eprintf("readRecord: readPage failed\n");
+        return -2;
+    }
+
     unsigned *pageUnsigned = (unsigned*) page;
 
     unsigned recordSize = pageUnsigned[PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2 + 1];
     unsigned offset = pageUnsigned[PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2];
 
     void *recordWithDirectory = malloc(recordSize);
+    if (recordWithDirectory == nullptr) {
+        eprintf("readRecord: malloc failed\n");
+        return -3;
+    }
+
     memcpy(recordWithDirectory, (uint8_t*) page + offset, recordSize);
     removeDirectoryFromRecord(recordDescriptor, recordSize, recordWithDirectory, data);
 
@@ -148,8 +173,11 @@ RC RecordBasedFileManager::addDirectoryToRecord(const vector<Attribute> &recordD
 
 RC RecordBasedFileManager::removeDirectoryFromRecord(const vector<Attribute> &recordDescriptor, unsigned recordSize, void *dataIn, void *dataOut) {
     int numNullBytes = ceil(recordDescriptor.size() / 8.0);
+    // 2 bytes per field for field directory
     int numDirectoryBytes = recordDescriptor.size() * 2;
+    // copy null bytes to new array
     memcpy(dataOut, dataIn, numNullBytes);
+    // copy fields to new array
     memcpy((uint8_t*) dataOut + numNullBytes, (uint8_t*) dataIn + numNullBytes + numDirectoryBytes, recordSize - numNullBytes - numDirectoryBytes);
     return 0;
 }
@@ -212,7 +240,15 @@ RC RecordBasedFileManager::getAvailableSpaceInPage(const void *data, unsigned &s
 // returns the slot id the record is given
 RC RecordBasedFileManager::writeRecord(FileHandle &fileHandle, unsigned recordLength, unsigned pageNum, const void *data, unsigned &sid) {
     void *page = malloc(PAGE_SIZE);
-    fileHandle.readPage(pageNum, page);
+    if (page == nullptr) {
+        eprintf("writeRecord: malloc failed\n");
+        return -1;
+    }
+
+    if(fileHandle.readPage(pageNum, page) != 0) {
+        eprintf("writeRecord: readPage failed\n");
+        return -2;
+    }
     unsigned *pageUnsigned = (unsigned*) page;
 
     // get offset to free space and number of records from end of page
@@ -233,7 +269,10 @@ RC RecordBasedFileManager::writeRecord(FileHandle &fileHandle, unsigned recordLe
     pageUnsigned[PAGE_SIZE / 4 - 2] = numRecords + 1;
     pageUnsigned[PAGE_SIZE / 4 - 1] = freeSpaceOffset + recordLength;
 
-    fileHandle.writePage(pageNum, page);
+    if (fileHandle.writePage(pageNum, page) != 0) {
+        eprintf("writeRecord: writePage failed\n");
+        return -3;
+    }
 
     free(page);
     return 0;
@@ -243,34 +282,52 @@ RC RecordBasedFileManager::writeRecord(FileHandle &fileHandle, unsigned recordLe
 RC RecordBasedFileManager::getNextPage(FileHandle &fileHandle, unsigned recordLength, unsigned &pageNum) {
     unsigned numPages = fileHandle.getNumberOfPages();
     void* data = malloc(PAGE_SIZE);
+    if (data == nullptr) {
+        eprintf("getNextPage: malloc failed\n");
+        return -1;
+    }
+
     unsigned space;
 
-    // check the last page
+    // if there are any pages, check them for free space
     if (numPages > 0) {
-        fileHandle.readPage(numPages - 1, data);
+        // check the last page
+        if (fileHandle.readPage(numPages - 1, data) != 0) {
+            eprintf("getNextPage: readPage failed\n");
+            return -2;
+        }
+
         getAvailableSpaceInPage(data, space);
         if(space >= recordLength + 8){
             pageNum = numPages - 1;
             free(data);
             return 0;
         }
-    }
 
-    // if the last page doesn't have space, check all the other pages
-    for(unsigned pg_offset = 0; pg_offset < numPages - 1; pg_offset++){
-        fileHandle.readPage(pg_offset, data);
-        getAvailableSpaceInPage(data, space);
-        if(space >= recordLength + 8){
-            pageNum = pg_offset;
-            free(data);
-            return 0;
+        // if the last page doesn't have space, check all the other pages
+        for(unsigned pg_offset = 0; pg_offset < numPages - 1; pg_offset++){
+            if (fileHandle.readPage(pg_offset, data) != 0) {
+                eprintf("getNextPage: readPage failed\n");
+                return -3;
+            }
+
+            getAvailableSpaceInPage(data, space);
+            if(space >= recordLength + 8){
+                pageNum = pg_offset;
+                free(data);
+                return 0;
+            }
         }
     }
 
     // if no pages have space, append a new page
     createNewPage(data);
-    fileHandle.appendPage(data);
-    pageNum = ++numPages;
+    if (fileHandle.appendPage(data) != 0) {
+        eprintf("getNextPage: appendPage failed\n");
+        return -4;
+    }
+
+    pageNum = numPages;
     free(data);
     return 0;
 }
