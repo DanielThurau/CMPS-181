@@ -1,6 +1,9 @@
 #ifndef _rbfm_h_
 #define _rbfm_h_
 
+#define FREE_SPACE_INDEX PAGE_SIZE / 4 - 1
+#define NUM_SLOT_INDEX PAGE_SIZE / 4 - 2
+
 #include <string>
 #include <string.h>
 #include <math.h>

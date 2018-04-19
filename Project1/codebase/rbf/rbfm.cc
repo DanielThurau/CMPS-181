@@ -111,8 +111,8 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
 
     unsigned *pageUnsigned = (unsigned*) page;
 
-    unsigned recordSize = pageUnsigned[PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2 + 1];
-    unsigned offset = pageUnsigned[PAGE_SIZE / 4 - 2 - (rid.slotNum + 1) * 2];
+    unsigned recordSize = pageUnsigned[NUM_SLOT_INDEX - (rid.slotNum + 1) * 2 + 1];
+    unsigned offset = pageUnsigned[NUM_SLOT_INDEX - (rid.slotNum + 1) * 2];
 
     void *recordWithDirectory = malloc(recordSize);
     if (recordWithDirectory == nullptr) {
@@ -213,9 +213,9 @@ RC RecordBasedFileManager::createNewPage(void *data) {
     unsigned *pageUnsigned = (unsigned*) data;
 
     // write 0 to last 4 bytes of data for offset to start of free space
-    pageUnsigned[PAGE_SIZE / 4 - 1] = 0;
+    pageUnsigned[FREE_SPACE_INDEX] = 0;
     // write 0 to second-to-last 4 bytes of data for num of slots
-    pageUnsigned[PAGE_SIZE / 4 - 2] = 0;
+    pageUnsigned[NUM_SLOT_INDEX] = 0;
 
     return 0;
 }
@@ -225,9 +225,9 @@ RC RecordBasedFileManager::getAvailableSpaceInPage(const void *data, unsigned &s
     unsigned *pageUnsigned = (unsigned*) data;
 
     // get offset to start of free space from last 4 bytes of page
-    unsigned freeSpaceOffset = pageUnsigned[PAGE_SIZE / 4 - 1];
+    unsigned freeSpaceOffset = pageUnsigned[FREE_SPACE_INDEX];
     // get number of records from second-to-last 4 bytes of page
-    unsigned numRecords = pageUnsigned[PAGE_SIZE / 4 - 2];
+    unsigned numRecords = pageUnsigned[NUM_SLOT_INDEX];
 
     // remaining free space in page is page size - space occupied by records - 8 bytes for offset and num records
     // - 8 bytes per record for record directory
@@ -252,22 +252,22 @@ RC RecordBasedFileManager::writeRecord(FileHandle &fileHandle, unsigned recordLe
     unsigned *pageUnsigned = (unsigned*) page;
 
     // get offset to free space and number of records from end of page
-    unsigned freeSpaceOffset = pageUnsigned[PAGE_SIZE / 4 - 1];
-    unsigned numRecords = pageUnsigned[PAGE_SIZE / 4 - 2];
+    unsigned freeSpaceOffset = pageUnsigned[FREE_SPACE_INDEX];
+    unsigned numRecords = pageUnsigned[NUM_SLOT_INDEX];
 
     // copy record into page starting at free space offset
     memcpy((uint8_t*)page + freeSpaceOffset, data, recordLength);
 
     // add new record offset and length to record directory
-    pageUnsigned[PAGE_SIZE / 4 - 2 - numRecords * 2 - 2] = freeSpaceOffset;
-    pageUnsigned[PAGE_SIZE / 4 - 2 - numRecords * 2 - 1] = recordLength;
+    pageUnsigned[NUM_SLOT_INDEX - numRecords * 2 - 2] = freeSpaceOffset;
+    pageUnsigned[NUM_SLOT_INDEX - numRecords * 2 - 1] = recordLength;
 
     // return slot id
     sid = numRecords;
 
     // update number of records and offset to free space in page
-    pageUnsigned[PAGE_SIZE / 4 - 2] = numRecords + 1;
-    pageUnsigned[PAGE_SIZE / 4 - 1] = freeSpaceOffset + recordLength;
+    pageUnsigned[NUM_SLOT_INDEX] = numRecords + 1;
+    pageUnsigned[FREE_SPACE_INDEX] = freeSpaceOffset + recordLength;
 
     if (fileHandle.writePage(pageNum, page) != 0) {
         eprintf("writeRecord: writePage failed\n");
