@@ -5,7 +5,7 @@ typedef unsigned PageNum;
 typedef int RC;
 typedef char byte;
 
-
+// error printing macro
 #define eprintf(...) fprintf (stderr, __VA_ARGS__)
 
 #define PAGE_SIZE 4096
