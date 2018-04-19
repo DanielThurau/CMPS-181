@@ -1,31 +1,76 @@
 1. Basic information
-Team number:
+Team number: 15
 Student ID of submitter: mlgrant
 Student Name of submitter: Morgan Grant
 Other Team Members: Preston Fraser, Daniel Thurau
 
 
 2. Internal Record Format
-- Show your record format design and describe how your design satisfies O(1) field access.
-If not, just mention that you haven't implemented this feature.
+	- Show your record format design and describe how your design satisfies O(1) field access. If not, just mention that you haven't implemented this feature.
 
+Call F the number of fields in the record. The record starts with ceil(F / 8) bytes for a null field indicator. There are then F * 2 bytes for the field directory. Each 2 bytes forms an unsigned 16-bit integer that gives the offset of the end of each field from the start of the fields in the record. After this field directory is all of the field data.
 
-- Describe how you store a VarChar field.
+To access the k’th field in the record, you would first get the k’th and the k-1’th entry in the field directory. The k-1’th entry gives you the start of the field, and the difference between the k and k-1’th entries gives the length of the field. Use the start and the length to retrieve the field from the record. Since accessing the k’th field does not depend on knowing anything about any of the previous fields, field access is O(1).
+
+	- Describe how you store a VarChar field.
+
 We store a VarChar field in two components, as specified: 4 bytes to store the length of
 the characters, then the list of characters stored.
 
 3. Page Format
-Our page format has a slot directory at the back which, starting from the back, contains an
-offset to the start of the free space (4 bytes), the number of slots in use (4 bytes), and
-then an offset (4 bytes) and record length (4 bytes) for each slot being used in the page.
-The actual records are stored at the front and back of the page, growing towards the middle
-as insertions are made. The free space is stored between the growing list of records on
-either side.
+
+Our page format uses the slot directory method. Starting from the end of the page (byte 4096) we have 4 bytes (4092-4095) to be cast to an unsigned integer representing the number of slots used in the page. The next 4 bytes (4088-4091) are to be cast to unsigned integer that is an offset from the beginning of the page to the start of free space (by our definition free space ranges from that offset to the end of the slot directory).  Whenever a new record needed to be added (determined by our rbfm algorithm) the page is created to contain 4096 bytes, with these values initialized to zero.
+
+The slot directory then has an additional N * 8 byte entries that store information about the slots inside the page (where N is the number of slots tracked by the integer at bytes 4092-4096. Each of these entries are split into two four bytes integers that represent the start of the slot (offset from start of page) and length of slot. These slots are what the records are stored in.
+
+When a record is inserted, we have an algorithm that determines that checks if a page has enough free space to store the record (further explained in section 4). Once the page is selected, we insert the record at the beginning of free space, update the free space offset to be at the end of the record, add the new entry to the directory, and increment the number of slots.
 
 4. Implementation Detail
-- Other implementation details goes here.
 
+	Calculating free space:
 
-5. Other (optional)
-- Freely use this section to tell us about other things related to the project 1 (optional)
+Calculating how much free space we need to insert a record into a page is a very  trivial calculation, but can be lead to slot directory corruption if done incorrectly. After obtaining the record and calculating its length with updated format (see below) we check all the pages coupled with a file (see algorithm below). 
+
+With a page, we obtain the number of slots, and the free space offset. We then calculate how many bytes the slot directory takes. This is done by multiplying ((N + 1) * 8) + 8 where N + 1 is the number of slots with a possible new entry times the space per slot directory entry plus the space taken by N and offset variables. 
+
+We then subtract from PAGE_SIZE the free space indicator, and the slot directory size. This yields the amount of space left for a single record to be inserted into. IF it is greater than or equal to the size of the record we are attempting to insert, we return the pageNumber in the file.
+
+	Page search algorithm:
+
+The page insertion algorithm is very simple. If the number of pages in a file is 0, we simply create and append a new page to the file and return that page (we assume from piazza that a single record will always fit on a page). 
+
+If there is at least one page, we check the last page appended (easy to know since the getNumberOfPages() function returns the number of pages) to see if we can fit the record: using the free space calculation stated above. 
+
+If this page is full, we do a scan of all pages starting from index 0 and check each page’s free space until we find a page with space for a record and return that page number. 
+
+IF every single page is incapable of storing the record, we create and append a new page to the file and return that page number after performing administration work on the file.
+
+	Record length: 
+
+To insert the record into a page, we needed to know exactly how long that record is. We receive the packed record with its recordDescriptor vector and iterate through the recordDescriptor, calculating the total size we will need (*there is no information passed about total size of record and the data is a void* so there is no builtin c++ function. Necessary evil). Once we’ve calculated the size we update the record to contain the field directory which adds 2 bytes per field, and keep the length as a variable for later use.
+
+	Writing records:
+
+Using the methods discussed above, we insert a record by:
+determining record length 
+updating the record representation to field directory
+finding the page with available space
+writing the record
+returnin the RID 
+
+	Reading records:
+		
+From a given RID, it is trivial to find the record. We first find the page in a file, and read it into a void*. We then read the entry from the page with the information provided in the slot directory (length and offset from start of page). We then convert it back to the original record format and return it. 
+		
+	addDirectoryToRecord:
+
+This function adds a field directory to a record. It loops through every field in the record, calculates the offset from the start of the first field in the record to the end of that field and inserts all of those offsets into the record.
+
+	removeDirectoryFromRecord:
+
+Does the opposite of addDirectoryToRecord. Removes the field directory from the record so that it can be returned from readRecord in its original format.
+
+	File and page operations:
+	
+We used basic cstdio functions to manipulate all files, which was trivially easy because we knew that each page was 4096 bytes long.
 
