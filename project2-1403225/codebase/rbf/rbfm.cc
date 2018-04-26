@@ -108,7 +108,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 
     // Updating the slot directory header.
     slotHeader.freeSpaceOffset = newRecordEntry.offset;
-    if (emptySlotDirectoryEntryNum != -1) {
+    if (emptySlotDirectoryEntryNum == -1) {
         slotHeader.recordEntriesNumber += 1;
     }
     setSlotDirectoryHeader(pageData, slotHeader);
@@ -234,8 +234,8 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     deleteSlotDirectoryEntry(pageData, trueRid.slotNum);
 
     // move records to coalesce free space in center of page
-    void *newDataStart = pageData + slotHeader.freeSpaceOffset + recordEntry.length;
-    void *oldDataStart = pageData + slotHeader.freeSpaceOffset;
+    void *newDataStart = (char*) pageData + slotHeader.freeSpaceOffset + recordEntry.length;
+    void *oldDataStart = (char*) pageData + slotHeader.freeSpaceOffset;
     size_t movedDataLength = recordEntry.offset - slotHeader.freeSpaceOffset  - recordEntry.length;
     // if there are any records to move
     if (movedDataLength > 0) {
@@ -396,10 +396,10 @@ bool RecordBasedFileManager::canRecordFitInPage(void * page, unsigned recordLeng
     SlotDirectoryHeader slotHeader = getSlotDirectoryHeader(page);
     unsigned freeSpaceInPage = slotHeader.freeSpaceOffset - slotHeader.recordEntriesNumber * sizeof(SlotDirectoryRecordEntry) - sizeof(SlotDirectoryHeader);
     if (getEmptySlotDirectoryEntry(page) == -1) {
-        return freeSpaceInPage- recordLength - sizeof(SlotDirectoryRecordEntry) >= 0;
+        return freeSpaceInPage >= recordLength + sizeof(SlotDirectoryRecordEntry);
     }
     else {
-        return freeSpaceInPage - recordLength >= 0;
+        return freeSpaceInPage >= recordLength;
     }
 }
 
@@ -556,7 +556,7 @@ RID RecordBasedFileManager::followForwardingAddresses(FileHandle fileHandle, RID
     for(;;) {
         fileHandle.readPage(curRid.pageNum, pageData);
         entry = getSlotDirectoryRecordEntry(pageData, curRid.slotNum);
-        if (entry.offset >= 0) {
+        if (entry.offset > 0) {
             free(pageData);
             return curRid;
         }
