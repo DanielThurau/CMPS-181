@@ -236,7 +236,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     // move records to coalesce free space in center of page
     void *newDataStart = (char*) pageData + slotHeader.freeSpaceOffset + recordEntry.length;
     void *oldDataStart = (char*) pageData + slotHeader.freeSpaceOffset;
-    size_t movedDataLength = recordEntry.offset - slotHeader.freeSpaceOffset  - recordEntry.length;
+    size_t movedDataLength = recordEntry.offset - slotHeader.freeSpaceOffset;
     // if there are any records to move
     if (movedDataLength > 0) {
         memmove(newDataStart, oldDataStart, movedDataLength);
