@@ -211,6 +211,40 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
     return SUCCESS;
 }
 
+RC deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid){
+
+	// Delete record.
+
+	// Move following pages into new gap.
+	
+	return SUCCESS;
+}
+
+// Assume the RID does not change after an update
+RC updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid){
+
+	// If updated record stays same length, leave at current spot.
+
+	// If updated record is smaller, pack the surrounding records against it (maintaining free space in the middle.)
+
+	// If updated record is larger + enough free space, move into free space and pack records to fill new gap.
+
+	// If updated record is larger + not enough space, move to a page with enough free space and leave behind forwarding address.
+
+	return SUCCESS;
+}
+
+RC readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data){
+
+	return SUCCESS;
+}
+
+RC scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp,
+	const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator){
+
+	return SUCCESS;
+}
+
 SlotDirectoryHeader RecordBasedFileManager::getSlotDirectoryHeader(void * page)
 {
     // Getting the slot directory header.
