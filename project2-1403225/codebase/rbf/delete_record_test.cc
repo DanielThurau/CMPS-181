@@ -40,8 +40,10 @@ int test_delete_record(RecordBasedFileManager *rbfm) {
     
     rc = rbfm->insertRecord(fileHandle, recordDescriptor, record, rid);
     assert(rc == success && "Inserting a record should not fail.");
+
+    RID newrid;
     
-    rc = rbfm->insertRecord(fileHandle, recordDescriptor, record, rid);
+    rc = rbfm->insertRecord(fileHandle, recordDescriptor, record, newrid);
     assert(rc == success && "Inserting a record should not fail.");
 
     // Given the rid, read the record from file
@@ -63,11 +65,17 @@ int test_delete_record(RecordBasedFileManager *rbfm) {
     rc = rbfm->deleteRecord(fileHandle, recordDescriptor, rid);
     assert(rc == success && "Deleting a record should not fail.");
     
-    rc = rbfm->insertRecord(fileHandle, recordDescriptor, record, rid);
-    assert(rc == success && "Inserting a record should not fail.");
-
-    rc = rbfm->readRecord(fileHandle, recordDescriptor, rid, returnedData);
+    rc = rbfm->readRecord(fileHandle, recordDescriptor, newrid, returnedData);
     assert(rc == success && "Reading a record should not fail.");
+    
+    // Compare whether the two memory blocks are the same
+    if(memcmp(record, returnedData, recordSize) != 0)
+    {
+        cout << "[FAIL] Test Case 8 Failed!" << endl << endl;
+        free(record);
+        free(returnedData);
+        return -1;
+    }
 
     char *pageData = (char*) malloc(PAGE_SIZE);
     fileHandle.readPage(0, pageData);
