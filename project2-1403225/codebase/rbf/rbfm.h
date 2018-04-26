@@ -174,7 +174,7 @@ private:
   SlotDirectoryRecordEntry getSlotDirectoryRecordEntry(void * page, unsigned recordEntryNumber);
   void setSlotDirectoryRecordEntry(void * page, unsigned recordEntryNumber, SlotDirectoryRecordEntry recordEntry);
 
-  unsigned getPageFreeSpaceSize(void * page);
+  bool canRecordFitInPage(void * page, unsigned recordLength);
   unsigned getRecordSize(const vector<Attribute> &recordDescriptor, const void *data);
 
   int getNullIndicatorSize(int fieldCount);
@@ -182,6 +182,12 @@ private:
 
   void setRecordAtOffset(void *page, unsigned offset, const vector<Attribute> &recordDescriptor, const void *data);
   void getRecordAtOffset(void *record, unsigned offset, const vector<Attribute> &recordDescriptor, void *data);
+
+  int getEmptySlotDirectoryEntry(void *page);
+
+  RID followForwardingAddresses(FileHandle fileHandle, RID startRid);
+  RID deleteForwardingAddresses(FileHandle fileHandle, RID startRid);
+  void deleteSlotDirectoryEntry(void *page, unsigned slotNum);
 };
 
 #endif
