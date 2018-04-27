@@ -134,7 +134,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     // follow all the forwarding addresses to get to the true location of the record
-    RID trueRid = followForwardingAddresses(fileHandle, rid);
+    RID trueRid = followForwardingAddress(fileHandle, rid);
 
     // Retrieve the specific page
     void * pageData = malloc(PAGE_SIZE);
@@ -222,57 +222,92 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
 
 RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid){
     // delete all the forwarding addresses for this record and get the true rid
-    RID trueRid = deleteForwardingAddresses(fileHandle, rid);
+    RID trueRid = deleteForwardingAddress(fileHandle, rid);
     
     void * pageData = malloc(PAGE_SIZE);
+    if (pageData == NULL)
+        return RBFM_MALLOC_FAILED;
     if (fileHandle.readPage(trueRid.pageNum, pageData))
         return RBFM_READ_FAILED;
-    
-    SlotDirectoryHeader slotHeader = getSlotDirectoryHeader(pageData);
-    
-    SlotDirectoryRecordEntry recordEntry = getSlotDirectoryRecordEntry(pageData, trueRid.slotNum);
-    deleteSlotDirectoryEntry(pageData, trueRid.slotNum);
 
-    // move records to coalesce free space in center of page
-    void *newDataStart = (char*) pageData + slotHeader.freeSpaceOffset + recordEntry.length;
-    void *oldDataStart = (char*) pageData + slotHeader.freeSpaceOffset;
-    size_t movedDataLength = recordEntry.offset - slotHeader.freeSpaceOffset;
-    // if there are any records to move
-    if (movedDataLength > 0) {
-        memmove(newDataStart, oldDataStart, movedDataLength);
-    }
-
-    // update offsets of all records that were moved
-    SlotDirectoryRecordEntry curDirectoryEntry;
-    for (int i = 0; i < slotHeader.recordEntriesNumber; i++) {
-        curDirectoryEntry = getSlotDirectoryRecordEntry(pageData, i);
-        if (curDirectoryEntry.offset < recordEntry.offset && curDirectoryEntry.offset > 0) {
-            curDirectoryEntry.offset += recordEntry.length;
-        }
-        setSlotDirectoryRecordEntry(pageData, i, curDirectoryEntry);
-    }
-
-    // update free space offset
-    slotHeader.freeSpaceOffset += recordEntry.length;
-    setSlotDirectoryHeader(pageData, slotHeader);
+    // remove the record
+    removeRecordFromPage(pageData, trueRid.slotNum);
 
     // write page back
-    fileHandle.writePage(trueRid.pageNum, pageData);
+    if(fileHandle.writePage(trueRid.pageNum, pageData))
+        return RBFM_WRITE_FAILED;
 
     free(pageData);
 	return SUCCESS;
 }
 
-// Assume the RID does not change after an update
 RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid){
+    RID trueRid = followForwardingAddress(fileHandle, rid);
+    void *pageData = malloc(PAGE_SIZE);
+    fileHandle.readPage(trueRid.pageNum, pageData);
 
-	// If updated record stays same length, leave at current spot.
+    SlotDirectoryRecordEntry recordEntry = getSlotDirectoryRecordEntry(pageData, trueRid.slotNum);
 
-	// If updated record is smaller, pack the surrounding records against it (maintaining free space in the middle.)
+    unsigned newSize = getRecordSize(recordDescriptor, data);
 
-	// If updated record is larger + enough free space, move into free space and pack records to fill new gap.
+    // how much bigger the new record is than the old one
+    // may be negative
+    int sizeIncrease = (int) newSize - (int) recordEntry.length;
 
-	// If updated record is larger + not enough space, move to a page with enough free space and leave behind forwarding address.
+    // if there's not enough space in this page for the new record, then forward
+    if (sizeIncrease > (int) getPageFreeSpaceSize(pageData)) {
+        RID newRid;
+        insertRecord(fileHandle, recordDescriptor, data, newRid);
+        removeRecordFromPage(pageData, trueRid.slotNum);
+
+        // form a forwarding address
+        SlotDirectoryRecordEntry forwardingAddress;
+        forwardingAddress.length = newRid.slotNum;
+        forwardingAddress.offset = -newRid.pageNum;
+
+        // if this record has already been forwarded, then update its original forwarding address
+        if (rid.pageNum != trueRid.pageNum) {
+            void *origPage = malloc(PAGE_SIZE);
+            fileHandle.readPage(rid.pageNum, origPage);
+            setSlotDirectoryRecordEntry(origPage, rid.slotNum, forwardingAddress);
+            fileHandle.writePage(rid.pageNum, origPage);
+            free(origPage);
+        }
+        // otherwise just add the forwarding address to this page
+        else {
+            setSlotDirectoryRecordEntry(pageData, trueRid.slotNum, forwardingAddress);
+        }
+    }
+    else {
+        SlotDirectoryHeader slotHeader = getSlotDirectoryHeader(pageData);
+        void *newDataStart = (char*) pageData + slotHeader.freeSpaceOffset - sizeIncrease;
+        void *oldDataStart = (char*) pageData + slotHeader.freeSpaceOffset;
+        size_t movedDataLength = recordEntry.offset - slotHeader.freeSpaceOffset;
+        // move other records if we need to 
+        if (movedDataLength > 0 && newDataStart != oldDataStart) {
+            memmove(newDataStart, oldDataStart, movedDataLength);
+        }
+
+        // update offsets of all records that were moved
+        SlotDirectoryRecordEntry curDirectoryEntry;
+        for (int i = 0; i < slotHeader.recordEntriesNumber; i++) {
+            curDirectoryEntry = getSlotDirectoryRecordEntry(pageData, i);
+            if (curDirectoryEntry.offset < recordEntry.offset && curDirectoryEntry.offset > 0) {
+                curDirectoryEntry.offset -= sizeIncrease;
+            }
+            setSlotDirectoryRecordEntry(pageData, i, curDirectoryEntry);
+        }
+
+        // update free space offset
+        slotHeader.freeSpaceOffset += recordEntry.length;
+        setSlotDirectoryHeader(pageData, slotHeader);
+
+        // copy new data into its new home
+        memcpy((char*) newDataStart + movedDataLength, data, newSize);
+    }
+
+    fileHandle.writePage(trueRid.pageNum, pageData);
+    free(pageData);
 
 	return SUCCESS;
 }
@@ -409,11 +444,16 @@ bool RecordBasedFileManager::fieldIsNull(char *nullIndicator, int i)
     return (nullIndicator[indicatorIndex] & indicatorMask) != 0;
 }
 
+unsigned RecordBasedFileManager::getPageFreeSpaceSize(void * page) 
+{
+    SlotDirectoryHeader slotHeader = getSlotDirectoryHeader(page);
+    return slotHeader.freeSpaceOffset - slotHeader.recordEntriesNumber * sizeof(SlotDirectoryRecordEntry) - sizeof(SlotDirectoryHeader);
+}
+
 // checks to see if a record of length recordLength can fit in a page
 // includes check to see if a new slot directory entry needs to be added
 bool RecordBasedFileManager::canRecordFitInPage(void * page, unsigned recordLength) {
-    SlotDirectoryHeader slotHeader = getSlotDirectoryHeader(page);
-    unsigned freeSpaceInPage = slotHeader.freeSpaceOffset - slotHeader.recordEntriesNumber * sizeof(SlotDirectoryRecordEntry) - sizeof(SlotDirectoryHeader);
+    unsigned freeSpaceInPage = getPageFreeSpaceSize(page);
     if (getEmptySlotDirectoryEntry(page) == -1) {
         return freeSpaceInPage >= recordLength + sizeof(SlotDirectoryRecordEntry);
     }
@@ -567,43 +607,38 @@ int RecordBasedFileManager::getEmptySlotDirectoryEntry(void *page) {
 }
 
 // follows all forwarding addresses to find true rid for a record
-RID RecordBasedFileManager::followForwardingAddresses(FileHandle fileHandle, RID startRid) {
+RID RecordBasedFileManager::followForwardingAddress(FileHandle fileHandle, RID startRid) {
     void * pageData = malloc(PAGE_SIZE);
     RID curRid = startRid;
-    SlotDirectoryRecordEntry entry;
 
-    for(;;) {
-        fileHandle.readPage(curRid.pageNum, pageData);
-        entry = getSlotDirectoryRecordEntry(pageData, curRid.slotNum);
-        if (entry.offset > 0) {
-            free(pageData);
-            return curRid;
-        }
+    fileHandle.readPage(curRid.pageNum, pageData);
+    SlotDirectoryRecordEntry entry = getSlotDirectoryRecordEntry(pageData, curRid.slotNum);
+    if (entry.offset < 0) {
         curRid.pageNum = -entry.offset;
         curRid.slotNum = entry.length;
     }
+
+    free(pageData);
+    return curRid;
 }
 
-// deletes all forwarding addresses associated with a record and returns the true rid
-RID RecordBasedFileManager::deleteForwardingAddresses(FileHandle fileHandle, RID startRid) {
+// deletes the forwarding address associated with a record and returns the true rid
+RID RecordBasedFileManager::deleteForwardingAddress(FileHandle fileHandle, RID startRid) {
     void * pageData = malloc(PAGE_SIZE);
     RID curRid = startRid;
-    SlotDirectoryRecordEntry entry;
 
-    for(;;) {
-        fileHandle.readPage(curRid.pageNum, pageData);
-        entry = getSlotDirectoryRecordEntry(pageData, curRid.slotNum);
-        if (entry.offset >= 0) {
-            free(pageData);
-            return curRid;
-        }
-
+    fileHandle.readPage(curRid.pageNum, pageData);
+    SlotDirectoryRecordEntry entry = getSlotDirectoryRecordEntry(pageData, curRid.slotNum);
+    if (entry.offset < 0) {
         deleteSlotDirectoryEntry(pageData, curRid.slotNum);
         fileHandle.writePage(curRid.pageNum, pageData);
 
         curRid.pageNum = -entry.offset;
         curRid.slotNum = entry.length;
     }
+
+    free(pageData);
+    return curRid;
 }
 
 // delete an entry from a slot directory
@@ -613,4 +648,35 @@ void RecordBasedFileManager::deleteSlotDirectoryEntry(void *page, unsigned slotN
     emptyDirectoryEntry.offset = 0;
 
     setSlotDirectoryRecordEntry(page, slotNum, emptyDirectoryEntry);
+}
+
+void RecordBasedFileManager::removeRecordFromPage(void *page, unsigned slotNum) {
+    SlotDirectoryHeader slotHeader = getSlotDirectoryHeader(page);
+    
+    // get the record entry for this record and then delete the record entry from this page
+    SlotDirectoryRecordEntry recordEntry = getSlotDirectoryRecordEntry(page, slotNum);
+    deleteSlotDirectoryEntry(page, slotNum);
+
+    // move records to coalesce free space in center of page
+    void *newDataStart = (char*) page + slotHeader.freeSpaceOffset + recordEntry.length;
+    void *oldDataStart = (char*) page + slotHeader.freeSpaceOffset;
+    size_t movedDataLength = recordEntry.offset - slotHeader.freeSpaceOffset;
+    // if there are any records to move
+    if (movedDataLength > 0) {
+        memmove(newDataStart, oldDataStart, movedDataLength);
+    }
+
+    // update offsets of all records that were moved
+    SlotDirectoryRecordEntry curDirectoryEntry;
+    for (int i = 0; i < slotHeader.recordEntriesNumber; i++) {
+        curDirectoryEntry = getSlotDirectoryRecordEntry(page, i);
+        if (curDirectoryEntry.offset < recordEntry.offset && curDirectoryEntry.offset > 0) {
+            curDirectoryEntry.offset += recordEntry.length;
+        }
+        setSlotDirectoryRecordEntry(page, i, curDirectoryEntry);
+    }
+
+    // update free space offset
+    slotHeader.freeSpaceOffset += recordEntry.length;
+    setSlotDirectoryHeader(page, slotHeader);
 }
