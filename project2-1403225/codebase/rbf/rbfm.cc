@@ -293,7 +293,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         for (int i = 0; i < slotHeader.recordEntriesNumber; i++) {
             curDirectoryEntry = getSlotDirectoryRecordEntry(pageData, i);
             if (curDirectoryEntry.offset < recordEntry.offset && curDirectoryEntry.offset > 0) {
-                curDirectoryEntry.offset += recordEntry.length;
+                curDirectoryEntry.offset -= sizeIncrease;
             }
             setSlotDirectoryRecordEntry(pageData, i, curDirectoryEntry);
         }
