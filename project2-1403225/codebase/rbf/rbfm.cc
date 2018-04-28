@@ -263,7 +263,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         // form a forwarding address
         SlotDirectoryRecordEntry forwardingAddress;
         forwardingAddress.length = newRid.slotNum;
-        forwardingAddress.offset = -newRid.pageNum;
+        forwardingAddress.offset = -newRid.pageNum; // COME BACK TO THIS.-------------
 
         // if this record has already been forwarded, then update its original forwarding address
         if (rid.pageNum != trueRid.pageNum) {
@@ -284,6 +284,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         void *newDataStart = (char*) pageData + slotHeader.freeSpaceOffset - sizeIncrease;
         void *oldDataStart = (char*) pageData + slotHeader.freeSpaceOffset;
         size_t movedDataLength = recordEntry.offset - slotHeader.freeSpaceOffset;
+        
         // move other records if we need to 
         if (movedDataLength > 0 && newDataStart != oldDataStart) {
             memmove(newDataStart, oldDataStart, movedDataLength);
@@ -323,10 +324,29 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 	return SUCCESS;
 }
 
+// Provided the record descriptor, scan the file.
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp,
-	const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator){
+    const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator){
 
-	return SUCCESS;
+    // Run through the list of attributes until we get the one we're filtering with.
+    int attrIndex = 0;
+    while(!recordDescriptor[attrIndex].name.compare(conditionAttribute)) attrIndex++;
+    void * attrData = malloc(recordDescriptor[attrIndex].AttrType); // Not feeling too confident with this.
+
+    // GET rid FOR WHAT'S BEING WRITTEN.
+    RID rid;
+
+    // For length of file, iterate through and readAttribute for each, comparing the values.
+    while (rbfm_ScanIterator(rid, data) != RBFM_EOF) {
+
+        readAttribute(fileHandle, recordDescriptor, rid, conditionAttribute, attrData);
+        if(attrData compOp value){
+            // Put it in the results with all attributeNames.
+        }
+        rbfm_ScanIterator.getNextRecord(rid, attrData);
+    }
+
+    return SUCCESS;
 }
 
 SlotDirectoryHeader RecordBasedFileManager::getSlotDirectoryHeader(void * page)
