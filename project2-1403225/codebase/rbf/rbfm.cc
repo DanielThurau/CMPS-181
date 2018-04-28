@@ -278,6 +278,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             setSlotDirectoryRecordEntry(pageData, trueRid.slotNum, forwardingAddress);
         }
     }
+    // if we don't need to forward, then just update this page
     else {
         SlotDirectoryHeader slotHeader = getSlotDirectoryHeader(pageData);
         void *newDataStart = (char*) pageData + slotHeader.freeSpaceOffset - sizeIncrease;
@@ -294,16 +295,21 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             curDirectoryEntry = getSlotDirectoryRecordEntry(pageData, i);
             if (curDirectoryEntry.offset < recordEntry.offset && curDirectoryEntry.offset > 0) {
                 curDirectoryEntry.offset -= sizeIncrease;
+                setSlotDirectoryRecordEntry(pageData, i, curDirectoryEntry);
             }
-            setSlotDirectoryRecordEntry(pageData, i, curDirectoryEntry);
         }
 
-        // update free space offset
-        slotHeader.freeSpaceOffset += recordEntry.length;
-        setSlotDirectoryHeader(pageData, slotHeader);
+        // update slot directory entry
+        recordEntry.length = newSize;
+        recordEntry.offset -= sizeIncrease;
+        setSlotDirectoryRecordEntry(pageData, trueRid.slotNum, recordEntry);
 
-        // copy new data into its new home
-        memcpy((char*) newDataStart + movedDataLength, data, newSize);
+        // write new record at its new offset
+        setRecordAtOffset(pageData, recordEntry.offset, recordDescriptor, data);
+
+        // update free space offset
+        slotHeader.freeSpaceOffset -= sizeIncrease;
+        setSlotDirectoryHeader(pageData, slotHeader);
     }
 
     fileHandle.writePage(trueRid.pageNum, pageData);
@@ -653,8 +659,8 @@ void RecordBasedFileManager::removeRecordFromPage(void *page, unsigned slotNum) 
         curDirectoryEntry = getSlotDirectoryRecordEntry(page, i);
         if (curDirectoryEntry.offset < recordEntry.offset && curDirectoryEntry.offset > 0) {
             curDirectoryEntry.offset += recordEntry.length;
+            setSlotDirectoryRecordEntry(page, i, curDirectoryEntry);
         }
-        setSlotDirectoryRecordEntry(page, i, curDirectoryEntry);
     }
 
     // update free space offset
