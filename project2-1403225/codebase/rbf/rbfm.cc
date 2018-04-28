@@ -319,7 +319,66 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
 	return SUCCESS;
 }
 
+// Return attribute value designated by attributeName
 RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data){
+    // may want to write function that just takes a filehandle and rid and return recordEntry
+    RID trueRid = followForwardingAddress(fileHandle, rid);
+
+    // need to get record length with just recordDescriptor,
+    // this forces us to read the record from the page to determine length of varchar
+    void *pageData = malloc(PAGE_SIZE);
+    fileHandle.readPage(trueRid.pageNum, pageData);
+    SlotDirectoryRecordEntry recordEntry = getSlotDirectoryRecordEntry(pageData, trueRid.slotNum);
+
+    // need to get r
+    void *recordData = malloc(recordEntry.length);
+
+    if (readRecord(fileHandle, recordDescriptor, rid, recordData))
+        return RBFM_READ_FAILED;
+
+    // grab index of record being read
+    int index = -1;
+    for (unsigned i = 0; i < recordDescriptor.size(); i++){
+        if (recordDescriptor[i].name == attributeName)
+            index = i;
+    }
+
+    if(index == -1)
+        return RBFM_ATTRIB_DN_EXIST;
+
+    // check if attribute is null
+    int nullIndicatorSize = getNullIndicatorSize(recordDescriptor.size());
+    char nullIndicator[nullIndicatorSize];
+    memset(nullIndicator, 0, nullIndicatorSize);
+    memcpy(nullIndicator, recordData, nullIndicatorSize);
+    if(fieldIsNull(nullIndicator, index)){
+        data = NULL;
+        free(pageData);
+        free(recordData);
+        return SUCCESS;
+    }
+
+    unsigned offset = attributeOffsetFromIndex(recordData, index, recordDescriptor);
+
+
+    switch (recordDescriptor[index].type){
+        case TypeInt:
+                memcpy(data, (char*)recordData + offset, INT_SIZE);
+            break;
+            case TypeReal:
+                memcpy(data, ((char*) recordData + offset), REAL_SIZE);
+            break;
+            case TypeVarChar:
+                // First VARCHAR_LENGTH_SIZE bytes describe the varchar length
+                uint32_t varcharSize;
+                memcpy(&varcharSize, ((char*) recordData + offset), VARCHAR_LENGTH_SIZE);
+                offset += VARCHAR_LENGTH_SIZE;
+                memcpy(data, ((char*) recordData + offset), varcharSize);
+            break;
+    }
+
+    free(pageData);
+    free(recordData);
 
 	return SUCCESS;
 }
@@ -686,4 +745,37 @@ void RecordBasedFileManager::removeRecordFromPage(void *page, unsigned slotNum) 
     // update free space offset
     slotHeader.freeSpaceOffset += recordEntry.length;
     setSlotDirectoryHeader(page, slotHeader);
+}
+
+unsigned RecordBasedFileManager::attributeOffsetFromIndex(void *record, unsigned index, const vector<Attribute> &recordDescriptor){
+    int nullIndicatorSize = getNullIndicatorSize(recordDescriptor.size());
+    char nullIndicator[nullIndicatorSize];
+    memset(nullIndicator, 0, nullIndicatorSize);
+    memcpy(nullIndicator, record, nullIndicatorSize);
+    
+    // We've read in the null indicator, so we can skip past it now
+    unsigned offset = nullIndicatorSize;
+
+    for (unsigned i = 0; i < index; i++){
+        bool isNull = fieldIsNull(nullIndicator, i);
+        if (isNull)
+            continue;
+        switch (recordDescriptor[i].type)
+        {
+            case TypeInt:
+                offset += INT_SIZE;
+            break;
+            case TypeReal:
+                offset += REAL_SIZE;
+            break;
+            case TypeVarChar:
+               // First VARCHAR_LENGTH_SIZE bytes describe the varchar length
+                uint32_t varcharSize;
+                memcpy(&varcharSize, ((char*) record + offset), VARCHAR_LENGTH_SIZE);
+                offset += VARCHAR_LENGTH_SIZE;
+                offset += varcharSize;
+            break;
+        }
+    }
+    return offset;
 }

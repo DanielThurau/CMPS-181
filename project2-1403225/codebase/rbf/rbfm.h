@@ -11,13 +11,14 @@
 #define REAL_SIZE               4
 #define VARCHAR_LENGTH_SIZE     4
 
-#define RBFM_CREATE_FAILED 1
-#define RBFM_MALLOC_FAILED 2
-#define RBFM_OPEN_FAILED   3
-#define RBFM_APPEND_FAILED 4
-#define RBFM_READ_FAILED   5
-#define RBFM_WRITE_FAILED  6
-#define RBFM_SLOT_DN_EXIST 7
+#define RBFM_CREATE_FAILED   1
+#define RBFM_MALLOC_FAILED   2
+#define RBFM_OPEN_FAILED     3
+#define RBFM_APPEND_FAILED   4
+#define RBFM_READ_FAILED     5
+#define RBFM_WRITE_FAILED    6
+#define RBFM_SLOT_DN_EXIST   7
+#define RBFM_ATTRIB_DN_EXIST 8
 
 using namespace std;
 
@@ -192,6 +193,8 @@ private:
   void deleteSlotDirectoryEntry(void *page, unsigned slotNum);
 
   void removeRecordFromPage(void *page, unsigned slotNum);
+
+  unsigned attributeOffsetFromIndex(void *record, unsigned index, const vector<Attribute> &recordDescriptor);
 };
 
 #endif
