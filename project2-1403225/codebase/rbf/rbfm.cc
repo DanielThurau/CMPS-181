@@ -8,6 +8,23 @@
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = NULL;
 PagedFileManager *RecordBasedFileManager::_pf_manager = NULL;
 
+RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) { 
+    
+    // get length of current record.
+    RecordLength recordLength; // = Something
+
+    // move iterator that far along the page.
+
+        // If the last record on the page, move to next page.
+    return RBFM_EOF;
+}
+
+RC RBFM_ScanIterator::close() {
+
+    ~RBFM_ScanIterator();
+    return -1;
+}
+
 RecordBasedFileManager* RecordBasedFileManager::instance()
 {
     if(!_rbf_manager)
@@ -284,7 +301,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         void *newDataStart = (char*) pageData + slotHeader.freeSpaceOffset - sizeIncrease;
         void *oldDataStart = (char*) pageData + slotHeader.freeSpaceOffset;
         size_t movedDataLength = recordEntry.offset - slotHeader.freeSpaceOffset;
-        
+
         // move other records if we need to 
         if (movedDataLength > 0 && newDataStart != oldDataStart) {
             memmove(newDataStart, oldDataStart, movedDataLength);
@@ -392,8 +409,9 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> 
     while(!recordDescriptor[attrIndex].name.compare(conditionAttribute)) attrIndex++;
     void * attrData = malloc(recordDescriptor[attrIndex].AttrType); // Not feeling too confident with this.
 
-    // GET rid FOR WHAT'S BEING WRITTEN.
     RID rid;
+    rid.pageNum = 0;
+    rid.slotNum = 0;
 
     // For length of file, iterate through and readAttribute for each, comparing the values.
     while (rbfm_ScanIterator(rid, data) != RBFM_EOF) {
@@ -404,6 +422,8 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> 
         }
         rbfm_ScanIterator.getNextRecord(rid, attrData);
     }
+
+    free(attrData);
 
     return SUCCESS;
 }
