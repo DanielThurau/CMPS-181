@@ -8,19 +8,43 @@
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = NULL;
 PagedFileManager *RecordBasedFileManager::_pf_manager = NULL;
 
-RBFM_ScanIterator::~RBFM_ScanIterator() {
+RBFM_ScanIterator::RBFM_ScanIterator() {
+}
 
+RBFM_ScanIterator::~RBFM_ScanIterator() {
+}
+
+RC RBFM_ScanIterator::init(FileHandle fileHandle,
+    const vector<Attribute> &recordDescriptor,
+    const string &conditionAttribute,
+    const CompOp compOp,
+    const void *value,
+    const vector<string> &attributeNames) {
+
+    this->fileHandle = fileHandle;
+    this->recordDescriptor = recordDescriptor;
+    this->conditionAttribute = conditionAttribute;
+    this->compOp = compOp;
+    this->value = const_cast<void *>(value);
+    this->attributeNames = attributeNames;
+
+    return SUCCESS;
 }
 
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) { 
-    
-    // get length of current record.
-    RecordLength recordLength; // = Something
+}
 
-    // move iterator that far along the page.
-
-        // If the last record on the page, move to next page.
-    return RBFM_EOF;
+RC RBFM_ScanIterator::updateCurRid() {
+    void *page = malloc(PAGE_SIZE);
+    fileHandle.readPage(curRid.pageNum, page);
+    SlotDirectoryHeader header = getSlotDirectoryHeader(page);
+    if(curRid.slotNum == header.recordEntriesNumber){
+        curRid.slotNum = 0;
+        curRid.pageNum++;
+    } else {
+        curRid.slotNum++;
+    }
+    free(page);
 }
 
 RC RBFM_ScanIterator::close() {
@@ -408,8 +432,7 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp,
     const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator){
 
-    // the below line doesn't work and I don't know why
-    //rbfm_ScanIterator = *new RBFM_ScanIterator(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames);
+    rbfm_ScanIterator.init(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames);
 
     return SUCCESS;
 }
