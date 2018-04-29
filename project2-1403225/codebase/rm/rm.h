@@ -4,6 +4,9 @@
 
 #include <string>
 #include <vector>
+#include <cstring>
+#include <cstdlib>
+#include <iostream>
 
 #include "../rbf/rbfm.h"
 
@@ -69,15 +72,16 @@ protected:
 
 private:
   static RelationManager *_rm;
-  static RecordBasedFileManager *_rbf_manager;
-  const string tablesFileName;
-  const string columnsFileName;
+  // static RecordBasedFileManager *_rbf_manager;
+  // RecordBasedFileManager *_rbf_manager = RecordBasedFileManager::instance(); 
+  string tablesFileName;
+  string columnsFileName;
   int tableCounter;
 
 
   void createTableDescriptor(vector<Attribute> &tableDescriptor);
   void createColumnDescriptor(vector<Attribute> &columnDescriptor);
-  void prepareTable(int attributeCount, unsigned char *nullAttributesIndicator, const int table-id, const string table-name, const string file-name, void *buffer, int *tupleSize);
+  void prepareTable(int attributeCount, unsigned char *nullAttributesIndicator, int table_id, string table_name, string file_name, void *buffer, int *tupleSize);
 
 
 };

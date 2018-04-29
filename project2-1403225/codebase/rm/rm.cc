@@ -1,8 +1,9 @@
 
 #include "rm.h"
 
+const int success = 0;
 RelationManager* RelationManager::_rm = 0;
-RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = NULL;
+// RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = RecordBasedFileManager::instance(); ;
 
 RelationManager* RelationManager::instance()
 {
@@ -14,14 +15,16 @@ RelationManager* RelationManager::instance()
 
 RelationManager::RelationManager()
 {
-  tablesFileName = "Tables.tbl"
-  columnsFileName = "Columns.tbl"
+
+  tablesFileName = "Tables.tbl";
+  columnsFileName = "Columns.tbl";
   tableCounter = 1;
 
 }
 
 RelationManager::~RelationManager()
 {
+  // _rbf_manager::instance();
 }
 
 RC RelationManager::createCatalog()
@@ -30,7 +33,7 @@ RC RelationManager::createCatalog()
       check if these tables exist in the file
     */ 
     RC rc;
-    rc = _rbf_manager->creaFile(tablesFileName);
+    rc = rbfm->createFile(tablesFileName);
     if(rc != success){
       return RBFM_CREATE_FAILED;
     }
@@ -44,15 +47,15 @@ RC RelationManager::createCatalog()
     vector<Attribute> tableDescriptor;
     createTableDescriptor(tableDescriptor);
 
-    int nullAttributesIndicatorActualSize = getNullIndicatorSize(tableDescriptor.size());
+    int nullAttributesIndicatorActualSize = rbfm->getNullIndicatorSize(tableDescriptor.size());
     unsigned char *nullsIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
     memset(nullsIndicator, 0, nullAttributesIndicatorActualSize);
 
 
     int tupleSize = 0;
     void *tuple = malloc(200);
-    prepareTable(tableDescriptor.size(), nullsIndicator, table-id, "table-name", "file-name", tuple, &tupleSize);
-    table-id++;
+    prepareTable(tableDescriptor.size(), nullsIndicator, tableCounter, "table-name", "file-name", tuple, &tupleSize);
+    tableCounter++;
 
     rbfm->printRecord(tableDescriptor, tuple);
 
@@ -127,17 +130,17 @@ void RelationManager::createTableDescriptor(vector<Attribute> &tableDescriptor){
   attr.name = "table-id";
   attr.type = TypeInt;
   attr.length = (AttrLength)4;
-  recordDescriptor.push_back(attr);
+  tableDescriptor.push_back(attr);
 
   attr.name = "table-name";
   attr.type = TypeVarChar;
   attr.length = (AttrLength)50;
-  recordDescriptor.push_back(attr);
+  tableDescriptor.push_back(attr);
 
   attr.name = "file-name";
   attr.type = TypeVarChar;
   attr.length = (AttrLength)50;
-  recordDescriptor.push_back(attr);
+  tableDescriptor.push_back(attr);
 
 }
 void RelationManager::createColumnDescriptor(vector<Attribute> &columnDescriptor){
@@ -147,36 +150,35 @@ void RelationManager::createColumnDescriptor(vector<Attribute> &columnDescriptor
   attr.name = "table-id";
   attr.type = TypeInt;
   attr.length = (AttrLength)4;
-  recordDescriptor.push_back(attr);
+  columnDescriptor.push_back(attr);
 
   attr.name = "column-name";
   attr.type = TypeVarChar;
   attr.length = (AttrLength)50;
-  recordDescriptor.push_back(attr);
+  columnDescriptor.push_back(attr);
 
   attr.name = "column-type";
   attr.type = TypeInt;
   attr.length = (AttrLength)4;
-  recordDescriptor.push_back(attr);
+  columnDescriptor.push_back(attr);
 
   attr.name = "column-length";
   attr.type = TypeInt;
   attr.length = (AttrLength)4;
-  recordDescriptor.push_back(attr);
+  columnDescriptor.push_back(attr);
 
   attr.name = "column-position";
   attr.type = TypeInt;
   attr.length = (AttrLength)4;
-  recordDescriptor.push_back(attr);
+  columnDescriptor.push_back(attr);
 }
 
 
-void RelationManager::prepareTable(int attributeCount, unsigned char *nullAttributesIndicator, const int table-id, const string table-name, const string file-name, void *buffer, int *tupleSize){
+void RelationManager::prepareTable(int attributeCount, unsigned char *nullAttributesIndicator, int table_id, string table_name, string file_name, void *buffer, int *tupleSize){
   int offset = 0;
 
   // Null-indicators
-  bool nullBit = false;
-  int nullAttributesIndicatorActualSize = getActualByteForNullsIndicator(attributeCount);
+  int nullAttributesIndicatorActualSize = rbfm->getNullIndicatorSize(attributeCount);
 
   // Null-indicator for the fields
   memcpy((char *)buffer + offset, nullAttributesIndicator, nullAttributesIndicatorActualSize);
@@ -185,12 +187,12 @@ void RelationManager::prepareTable(int attributeCount, unsigned char *nullAttrib
   // Beginning of the actual data    
   // Note that the left-most bit represents the first field. Thus, the offset is 7 from right, not 0.
   // e.g., if a tuple consists of four attributes and they are all nulls, then the bit representation will be: [11110000]
-  memcpy((char*)buffer + offset, table-id, 4);
+  memcpy((char*)buffer + offset, &table_id, 4);
   offset += 4;
-  memcpy((char*)buffer + offset, table-name, table-name.size());
-  offset += table-name.size();
-  memcpy((char*)buffer + offset, file-name, file-name.size());
-  offset += file-name.size();
+  memcpy((char*)buffer + offset, &table_name, table_name.size());
+  offset += table_name.size();
+  memcpy((char*)buffer + offset, &file_name, file_name.size());
+  offset += file_name.size();
 
   *tupleSize = offset;
 

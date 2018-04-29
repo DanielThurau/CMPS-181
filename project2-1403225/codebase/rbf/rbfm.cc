@@ -8,6 +8,7 @@
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = NULL;
 PagedFileManager *RecordBasedFileManager::_pf_manager = NULL;
 
+/*
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) { 
     
     // get length of current record.
@@ -19,11 +20,13 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
     return RBFM_EOF;
 }
 
+
 RC RBFM_ScanIterator::close() {
 
     ~RBFM_ScanIterator();
     return -1;
 }
+*/
 
 RecordBasedFileManager* RecordBasedFileManager::instance()
 {
@@ -399,7 +402,7 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 
 	return SUCCESS;
 }
-
+/*
 // Provided the record descriptor, scan the file.
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp,
     const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator){
@@ -427,7 +430,7 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> 
 
     return SUCCESS;
 }
-
+*/
 SlotDirectoryHeader RecordBasedFileManager::getSlotDirectoryHeader(void * page)
 {
     // Getting the slot directory header.
