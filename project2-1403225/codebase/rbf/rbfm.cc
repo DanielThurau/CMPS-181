@@ -8,6 +8,10 @@
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = NULL;
 PagedFileManager *RecordBasedFileManager::_pf_manager = NULL;
 
+RBFM_ScanIterator::~RBFM_ScanIterator() {
+
+}
+
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) { 
     
     // get length of current record.
@@ -20,9 +24,9 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 }
 
 RC RBFM_ScanIterator::close() {
+    delete this;
 
-    ~RBFM_ScanIterator();
-    return -1;
+    return 0;
 }
 
 RecordBasedFileManager* RecordBasedFileManager::instance()
@@ -404,26 +408,8 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp,
     const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator){
 
-    // Run through the list of attributes until we get the one we're filtering with.
-    int attrIndex = 0;
-    while(!recordDescriptor[attrIndex].name.compare(conditionAttribute)) attrIndex++;
-    void * attrData = malloc(recordDescriptor[attrIndex].AttrType); // Not feeling too confident with this.
-
-    RID rid;
-    rid.pageNum = 0;
-    rid.slotNum = 0;
-
-    // For length of file, iterate through and readAttribute for each, comparing the values.
-    while (rbfm_ScanIterator(rid, data) != RBFM_EOF) {
-
-        readAttribute(fileHandle, recordDescriptor, rid, conditionAttribute, attrData);
-        if(attrData compOp value){
-            // Put it in the results with all attributeNames.
-        }
-        rbfm_ScanIterator.getNextRecord(rid, attrData);
-    }
-
-    free(attrData);
+    // the below line doesn't work and I don't know why
+    //rbfm_ScanIterator = *new RBFM_ScanIterator(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames);
 
     return SUCCESS;
 }

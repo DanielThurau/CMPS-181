@@ -86,15 +86,35 @@ The scan iterator is NOT required to be implemented for the part 1 of the projec
 //  rbfmScanIterator.close();
 
 class RBFM_ScanIterator {
+private:
+  FileHandle fileHandle;
+  vector<Attribute> recordDescriptor;
+  const string &conditionAttribute;
+  const CompOp compOp;
+  const void *value;
+  const vector<string> &attributeNames;
+
 public:
-  RBFM_ScanIterator() {};
-  ~RBFM_ScanIterator() {};
+  RBFM_ScanIterator(FileHandle fileHandle,
+    const vector<Attribute> recordDescriptor,
+    const string &conditionAttribute,
+    const CompOp compOp,
+    const void *value,
+    const vector<string> &attributeNames):
+      fileHandle(fileHandle),
+      recordDescriptor(recordDescriptor),
+      conditionAttribute(conditionAttribute),
+      compOp(compOp),
+      value(value),
+      attributeNames(attributeNames) {};
+
+  ~RBFM_ScanIterator();
 
   // Never keep the results in the memory. When getNextRecord() is called, 
   // a satisfying record needs to be fetched from the file.
   // "data" follows the same format as RecordBasedFileManager::insertRecord().
-  RC getNextRecord(RID &rid, void *data) {};
-  RC close() { return -1; };
+  RC getNextRecord(RID &rid, void *data);
+  RC close();
 };
 
 
