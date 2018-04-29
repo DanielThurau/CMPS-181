@@ -69,6 +69,17 @@ protected:
 
 private:
   static RelationManager *_rm;
+  static RecordBasedFileManager *_rbf_manager;
+  const string tablesFileName;
+  const string columnsFileName;
+  int tableCounter;
+
+
+  void createTableDescriptor(vector<Attribute> &tableDescriptor);
+  void createColumnDescriptor(vector<Attribute> &columnDescriptor);
+  void prepareTable(int attributeCount, unsigned char *nullAttributesIndicator, const int table-id, const string table-name, const string file-name, void *buffer, int *tupleSize);
+
+
 };
 
 #endif
