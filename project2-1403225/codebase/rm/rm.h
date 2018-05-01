@@ -72,8 +72,7 @@ protected:
 
 private:
   static RelationManager *_rm;
-  // static RecordBasedFileManager *_rbf_manager;
-  // RecordBasedFileManager *_rbf_manager = RecordBasedFileManager::instance(); 
+  static RecordBasedFileManager *_rbf_manager;
   string tablesFileName;
   string columnsFileName;
   int tableCounter;

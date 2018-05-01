@@ -1,9 +1,8 @@
-
 #include "rm.h"
 
 const int success = 0;
 RelationManager* RelationManager::_rm = 0;
-// RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = RecordBasedFileManager::instance(); ;
+RecordBasedFileManager* RelationManager::_rbf_manager = 0;
 
 RelationManager* RelationManager::instance()
 {
@@ -20,11 +19,14 @@ RelationManager::RelationManager()
   columnsFileName = "Columns.tbl";
   tableCounter = 1;
 
+  createCatalog();
+
+
+
 }
 
 RelationManager::~RelationManager()
 {
-  // _rbf_manager::instance();
 }
 
 RC RelationManager::createCatalog()
@@ -33,13 +35,13 @@ RC RelationManager::createCatalog()
       check if these tables exist in the file
     */ 
     RC rc;
-    rc = rbfm->createFile(tablesFileName);
+    rc = _rbf_manager->createFile(tablesFileName);
     if(rc != success){
       return RBFM_CREATE_FAILED;
     }
 
     FileHandle fileHandle;
-    rc = rbfm->openFile(tablesFileName, fileHandle);
+    rc = _rbf_manager->openFile(tablesFileName, fileHandle);
     if(rc != success){
       return RBFM_OPEN_FAILED;
     }
@@ -47,17 +49,18 @@ RC RelationManager::createCatalog()
     vector<Attribute> tableDescriptor;
     createTableDescriptor(tableDescriptor);
 
-    int nullAttributesIndicatorActualSize = rbfm->getNullIndicatorSize(tableDescriptor.size());
+    int nullAttributesIndicatorActualSize = _rbf_manager->getNullIndicatorSize(tableDescriptor.size());
     unsigned char *nullsIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
     memset(nullsIndicator, 0, nullAttributesIndicatorActualSize);
 
+    cout << "fuck" << endl;
 
     int tupleSize = 0;
     void *tuple = malloc(200);
     prepareTable(tableDescriptor.size(), nullsIndicator, tableCounter, "table-name", "file-name", tuple, &tupleSize);
     tableCounter++;
 
-    rbfm->printRecord(tableDescriptor, tuple);
+    _rbf_manager->printRecord(tableDescriptor, tuple);
 
 
     return -1;
@@ -178,7 +181,7 @@ void RelationManager::prepareTable(int attributeCount, unsigned char *nullAttrib
   int offset = 0;
 
   // Null-indicators
-  int nullAttributesIndicatorActualSize = rbfm->getNullIndicatorSize(attributeCount);
+  int nullAttributesIndicatorActualSize = _rbf_manager->getNullIndicatorSize(attributeCount);
 
   // Null-indicator for the fields
   memcpy((char *)buffer + offset, nullAttributesIndicator, nullAttributesIndicatorActualSize);
