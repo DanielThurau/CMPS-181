@@ -28,6 +28,9 @@ RC RBFM_ScanIterator::init(FileHandle fileHandle,
     this->value = const_cast<void *>(value);
     this->attributeNames = attributeNames;
 
+    curRid.pageNum = 0;
+    curRid.slotNum = 0;
+
     // initialize nameToAttribute map
     for (size_t i = 0; i < recordDescriptor.size(); i++){
         nameToAttribute[recordDescriptor[i].name] = recordDescriptor[i];
@@ -59,6 +62,8 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         if (compFunc(attribute, compOp, value)) {
             rid = curRid;
             projectAttributes(data);
+            updateCurRid();
+            return SUCCESS;
         }
         updateCurRid();
     }
@@ -72,7 +77,7 @@ RC RBFM_ScanIterator::updateCurRid() {
     fileHandle.readPage(curRid.pageNum, page);
     SlotDirectoryHeader header = getSlotDirectoryHeader(page);
     // if curRid points to the last record in its page
-    if(curRid.slotNum == header.recordEntriesNumber){
+    if(curRid.slotNum + 1 == header.recordEntriesNumber){
         // reset slotNum and advance pageNum
         curRid.slotNum = 0;
         curRid.pageNum++;
@@ -182,6 +187,15 @@ RC RBFM_ScanIterator::close() {
     delete this;
 
     return 0;
+}
+
+// Provided the record descriptor, scan the file.
+RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp,
+    const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator){
+
+    rbfm_ScanIterator.init(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames);
+
+    return SUCCESS;
 }
 
 RecordBasedFileManager* RecordBasedFileManager::instance()

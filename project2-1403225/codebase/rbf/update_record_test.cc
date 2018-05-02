@@ -1,6 +1,7 @@
 #include "pfm.h"
 #include "rbfm.h"
 #include "test_util.h"
+#include <string.h>
 
 int test_delete_record(RecordBasedFileManager *rbfm) {
     cout << endl << "***** In RBF Test Case 8 *****" << endl;
@@ -29,25 +30,35 @@ int test_delete_record(RecordBasedFileManager *rbfm) {
     unsigned char nullFieldIndicator[numNullBytes];
     memset(nullFieldIndicator, 0, numNullBytes);
 
-    prepareRecord(recordDescriptor.size(), nullFieldIndicator, 7, "Preston", 21, 5.917, 150000, record_1, &record_1_size);
-    prepareRecord(recordDescriptor.size(), nullFieldIndicator, 6, "Morgan", 21, 6.25, 20000, record_2, &record_2_size);
+    prepareRecord(recordDescriptor.size(), nullFieldIndicator, 3, "Cow", 21, 5.917, 150000, record_1, &record_1_size);
+    prepareRecord(recordDescriptor.size(), nullFieldIndicator, 20, "AAAAABBBBBCCCCCDDDDD", 21, 6.25, 20000, record_2, &record_2_size);
 
-    rbfm->insertRecord(fileHandle, recordDescriptor, record_1, rid_1);
-    rbfm->insertRecord(fileHandle, recordDescriptor, record_1, rid_2);
-
-    rbfm->updateRecord(fileHandle, recordDescriptor, record_2, rid_1);
-
-    rbfm->readRecord(fileHandle, recordDescriptor, rid_1, returned_data);
-    if (memcmp(record_2, returned_data, record_2_size) != 0) {
-        cout << "record 2 didn't return correctly" << endl;
-        return 1;
+    do {
+        rbfm->insertRecord(fileHandle, recordDescriptor, record_1, rid_1);
     }
+    while (rid_1.pageNum == 0);
 
+    rid_2.pageNum = 0;
+    rid_2.slotNum = 0;
+
+    rbfm->updateRecord(fileHandle, recordDescriptor, record_2, rid_2);
     rbfm->readRecord(fileHandle, recordDescriptor, rid_2, returned_data);
-    if (memcmp(record_1, returned_data, record_1_size) != 0) {
-        cout << "record 1 didn't return correctly" << endl;
-        return 1;
+
+    if (memcmp(record_2, returned_data, record_2_size) != 0) {
+        printf("SUCK\n");
     }
+
+    void *page = malloc(PAGE_SIZE);
+    fileHandle.readPage(0, page);
+    for (int i = 0; i < PAGE_SIZE; i++) {
+        printf("%u ", ((uint8_t *) page)[i]);
+    }
+    printf("\n\n\n\n\n");
+    fileHandle.readPage(1, page);
+    for (int i = 0; i < PAGE_SIZE; i++) {
+        printf("%u ", ((uint8_t *) page)[i]);
+    }
+    printf("\n");
 
     free(record_1);
     free(record_2);
