@@ -50,17 +50,28 @@ RC RelationManager::createCatalog()
     createTableDescriptor(tableDescriptor);
 
 
-    int tupleSize = 0;
     void *tuple = malloc(200);
+<<<<<<< HEAD
     prepareTables(tableCounter++, "Tables", "Tables.tbl", tuple, &tupleSize, tableDescriptor);
     RID tablesRID;
     _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, tablesRID);
 
     prepareTables(tableCounter++, "Columns", "Columns.tbl", tuple, &tupleSize, tableDescriptor);
+=======
+    prepareTable(tableCounter++, "Tables", "Tables.tbl", tuple, tableDescriptor);
+    RID tablesRID;
+    _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, tablesRID);
+
+
+
+
+
+
+
+    prepareTable(tableCounter++, "Columns", "Columns.tbl", tuple, tableDescriptor);
+>>>>>>> f0d9bfe2a649a995336e8c88073dd575181291bf
     RID columnsRID;
     _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, columnsRID);
-    _rbf_manager->readRecord(fileHandle, tableDescriptor, columnsRID, tuple);
-    _rbf_manager->printRecord(tableDescriptor, tuple);
 
 
     return -1;
@@ -68,11 +79,37 @@ RC RelationManager::createCatalog()
 
 RC RelationManager::deleteCatalog()
 {
-    return -1;
+    RC rc;
+    rc = _rbf_manager->destroyFile(tablesFileName);
+    if(rc)
+      return rc;
+
+    rc = _rbf_manager->destroyFile(columnsFileName);
+    if(rc)
+      return rc;
+
+    return success;
 }
 
 RC RelationManager::createTable(const string &tableName, const vector<Attribute> &attrs)
 {
+    RC rc;
+    FileHandle fileHandle;
+    rc = _rbf_manager->openFile(tablesFileName, fileHandle);
+    if(rc != success){
+      return RBFM_OPEN_FAILED;
+    }
+
+    vector<Attribute> tableDescriptor;
+    createTableDescriptor(tableDescriptor);
+
+    void *tuple = malloc(200);
+    const string fileName = tableName + ".tbl";
+    prepareTable(tableCounter++, tableName, fileName, tuple, tableDescriptor);
+    
+    RID rid;
+    _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, rid);
+
 
     return -1;
 }
@@ -177,6 +214,7 @@ void RelationManager::createColumnDescriptor(vector<Attribute> &columnDescriptor
 }
 
 void RelationManager::prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor){
+
   int nullAttributesIndicatorActualSize = _rbf_manager->getNullIndicatorSize(tableDescriptor.size());
   unsigned char *nullAttributesIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
   memset(nullAttributesIndicator, 0, nullAttributesIndicatorActualSize);

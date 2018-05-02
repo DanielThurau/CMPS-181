@@ -80,10 +80,14 @@ private:
 
   void createTableDescriptor(vector<Attribute> &tableDescriptor);
   void createColumnDescriptor(vector<Attribute> &columnDescriptor);
+<<<<<<< HEAD
   void prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor);
   void prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor);
 
   //Columns(table-id:int, column-name:varchar(50), column-type:int, column-length:int, column-position:int)
+=======
+  void prepareTable(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor);
+>>>>>>> f0d9bfe2a649a995336e8c88073dd575181291bf
 
 
 };

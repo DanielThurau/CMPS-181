@@ -28,7 +28,160 @@ RC RBFM_ScanIterator::init(FileHandle fileHandle,
     this->value = const_cast<void *>(value);
     this->attributeNames = attributeNames;
 
+    // initialize nameToAttribute map
+    for (size_t i = 0; i < recordDescriptor.size(); i++){
+        nameToAttribute[recordDescriptor[i].name] = recordDescriptor[i];
+    }
+
+    // point compFunc to the appropriate comparison function for the type of conditionAttribute
+    switch (nameToAttribute[conditionAttribute].type) {
+        case TypeInt:
+            this->compFunc = checkNumberMeetsCondition<unsigned>;
+            break;
+        case TypeReal:
+            this->compFunc = checkNumberMeetsCondition<float>;
+            break;
+        case TypeVarChar:
+            this->compFunc = checkVarcharMeetsCondition;
+            break;
+    }
+
     return SUCCESS;
+}
+
+RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
+    // get condition attribute size from nameToAttribute map
+    void *attribute = malloc(nameToAttribute[conditionAttribute].length);
+    // when the current page num equals the total number of pages, we're out of records
+    while (curRid.pageNum < fileHandle.getNumberOfPages()) {
+        readAttribute(fileHandle, recordDescriptor, curRid, conditionAttribute, attribute);
+        // comp func is set to point to a comparision function appropriate for the type of conditionAttribute
+        if (compFunc(attribute, compOp, value)) {
+            rid = curRid;
+            projectAttributes(data);
+        }
+        updateCurRid();
+    }
+    free(attribute);
+    return RBFM_EOF;
+}
+
+RC RBFM_ScanIterator::updateCurRid() {
+    // get current page
+    void *page = malloc(PAGE_SIZE);
+    fileHandle.readPage(curRid.pageNum, page);
+    SlotDirectoryHeader header = getSlotDirectoryHeader(page);
+    // if curRid points to the last record in its page
+    if(curRid.slotNum == header.recordEntriesNumber){
+        // reset slotNum and advance pageNum
+        curRid.slotNum = 0;
+        curRid.pageNum++;
+    }
+    // otherwise just advance slotNum
+    else {
+        curRid.slotNum++;
+    }
+    free(page);
+    return SUCCESS;
+}
+
+// project the attributes in attributeNames from the record pointed to by curRid into data
+RC RBFM_ScanIterator::projectAttributes(void *data) {
+    // set the null indicator to all 0
+    int nullIndicatorSize = getNullIndicatorSize(attributeNames.size());
+    memset(data, 0, nullIndicatorSize);
+
+    // curAttribute is a pointer that moves as attributes are added
+    char *curAttribute = (char *) data + nullIndicatorSize;
+    Attribute attr;
+    unsigned varcharLength;
+
+    // for each attribute in attributeNames
+    for (size_t i = 0; i < attributeNames.size(); i++) {
+        RC rc = readAttribute(fileHandle, recordDescriptor, curRid, attributeNames[i], curAttribute);
+        // CHANGE THIS WHEN DAN CHOOSES AN ERROR CODE FOR NULL ATTRIBUTES
+        // if retreived attribute is null
+        if (rc == -1) {
+            // update null indicator
+            ((char *) data)[i / 8] |= 128 >> (i % 8);
+        }
+        else {
+            attr = nameToAttribute[attributeNames[i]];
+            if (attr.type == TypeInt || attr.type == TypeReal) {
+                curAttribute += attr.length;
+            }
+            else {
+                varcharLength = *((unsigned *) curAttribute);
+                curAttribute += varcharLength + VARCHAR_LENGTH_SIZE;
+            }
+        }
+    }
+    return SUCCESS;
+}
+
+template <class T>
+bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *value) {
+    if (compOp == NO_OP) return true;
+
+    T attr = *((T*) attribute);
+    T val = *((T*) value);
+
+    switch (compOp) {
+        case EQ_OP:
+            return attr == val;
+            break;
+        case LT_OP:
+            return attr < val;
+            break;
+        case LE_OP:
+            return attr <= val;
+            break;
+        case GT_OP:
+            return attr > val;
+            break;
+        case GE_OP:
+            return attr >= val;
+            break;
+        case NE_OP:
+            return attr != val;
+            break;
+        default:
+            return false;
+            break;
+    }
+}
+
+bool checkVarcharMeetsCondition(void *attribute, CompOp compOp, void *value) {
+    if (compOp == NO_OP) return true;
+
+    // get attribute and value lengths from first 4 bytes of varchar
+    unsigned attrLength = *((unsigned *) attribute);
+    unsigned valueLength = *((unsigned *) value);
+    // use min of lengths for memcmp
+    unsigned minLength = min<unsigned>(attrLength, valueLength);
+
+    // pointers to start of actual data in varchars
+    char *attrStart = (char *) attribute + VARCHAR_LENGTH_SIZE;
+    char *valueStart = (char *) value + VARCHAR_LENGTH_SIZE;
+
+    // memcmp
+    int diff = memcmp(attrStart, valueStart, minLength);
+    // if bytes up to minLength are the same and lengths aren't the same
+    if (diff == 0 && attrLength != valueLength) {
+        // force the shorter string to be less than the longer string
+        diff += attrLength < valueLength ? -1 : 1;
+    }
+
+    // save some code by reusing checkNumberMeetsCondition
+    // compare result of memcmp to 0
+    int zero = 0;
+    return checkNumberMeetsCondition<int>(&diff, compOp, &zero);
+}
+
+RC RBFM_ScanIterator::close() {
+    delete this;
+
+    return 0;
 }
 
 RecordBasedFileManager* RecordBasedFileManager::instance()
