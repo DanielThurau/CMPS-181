@@ -80,7 +80,9 @@ private:
 
   void createTableDescriptor(vector<Attribute> &tableDescriptor);
   void createColumnDescriptor(vector<Attribute> &columnDescriptor);
-  void prepareTable(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor);
+  void prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor);
+  void prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor);
+  RC createCatalogColumns(int tableID, int columnID);
 
 
 };
