@@ -11,14 +11,15 @@
 #define REAL_SIZE               4
 #define VARCHAR_LENGTH_SIZE     4
 
-#define RBFM_CREATE_FAILED   1
-#define RBFM_MALLOC_FAILED   2
-#define RBFM_OPEN_FAILED     3
-#define RBFM_APPEND_FAILED   4
-#define RBFM_READ_FAILED     5
-#define RBFM_WRITE_FAILED    6
-#define RBFM_SLOT_DN_EXIST   7
-#define RBFM_ATTRIB_DN_EXIST 8
+#define RBFM_CREATE_FAILED     1
+#define RBFM_MALLOC_FAILED     2
+#define RBFM_OPEN_FAILED       3
+#define RBFM_APPEND_FAILED     4
+#define RBFM_READ_FAILED       5
+#define RBFM_WRITE_FAILED      6
+#define RBFM_SLOT_DN_EXIST     7
+#define RBFM_ATTRIB_DN_EXIST   8
+#define RBFM_NULL              9
 
 using namespace std;
 
@@ -135,6 +136,7 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
 
   RC readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data);
 
+/*
   // Scan returns an iterator to allow the caller to go through the results one by one. 
   RC scan(FileHandle &fileHandle,
       const vector<Attribute> &recordDescriptor,
@@ -143,6 +145,8 @@ IMPORTANT, PLEASE READ: All methods below this comment (other than the construct
       const void *value,                    // used in the comparison
       const vector<string> &attributeNames, // a list of projected attributes
       RBFM_ScanIterator &rbfm_ScanIterator);
+*/
+  int getNullIndicatorSize(int fieldCount);
 
 protected:
   RecordBasedFileManager();
@@ -164,7 +168,7 @@ protected:
   unsigned getPageFreeSpaceSize(void * page);
   unsigned getRecordSize(const vector<Attribute> &recordDescriptor, const void *data);
 
-  int getNullIndicatorSize(int fieldCount);
+  
   bool fieldIsNull(char *nullIndicator, int i);
 
   void setRecordAtOffset(void *page, unsigned offset, const vector<Attribute> &recordDescriptor, const void *data);
