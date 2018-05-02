@@ -80,7 +80,7 @@ private:
 
   void createTableDescriptor(vector<Attribute> &tableDescriptor);
   void createColumnDescriptor(vector<Attribute> &columnDescriptor);
-  void prepareTable(int table_id, const string &table_name, const string &file_name, void *buffer, int *tupleSize, vector<Attribute> &tableDescriptor);
+  void prepareTable(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor);
 
 
 };
