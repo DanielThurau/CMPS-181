@@ -65,49 +65,58 @@ int RBFTest_8b(RecordBasedFileManager *rbfm) {
     
 
 
+// -------------------------------------------
+
     cout << endl << "Attribute Data:" << endl;
 
 
 
-    rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "Age", attributeData);
-    if(rc == RBFM_NULL){
-        cout << "Attribute Age: " << "NULL" << endl;
-    }
-    uint32_t data_integer;
-    memcpy(&data_integer, attributeData, INT_SIZE);
-    cout << "Attribute Age: " << data_integer << endl;
+    // rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "Age", attributeData);
+    // if(rc == RBFM_NULL){
+    //     cout << "Attribute Age: " << "NULL" << endl;
+    // }
+    // uint32_t data_integer;
+    // memcpy(&data_integer, attributeData, INT_SIZE);
+    // cout << "Attribute Age: " << data_integer << endl;
 
 
 
 
-    rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "Height", attributeData);   
-    if(rc == RBFM_NULL){
-        cout << "Attribute Height: " << "NULL" << endl;
-    }
-    float data_real;
-    memcpy(&data_real, attributeData, REAL_SIZE);
-    cout << "Attribute Height: " << data_real << endl;
+    // rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "Height", attributeData);   
+    // if(rc == RBFM_NULL){
+    //     cout << "Attribute Height: " << "NULL" << endl;
+    // }
+    // float data_real;
+    // memcpy(&data_real, attributeData, REAL_SIZE);
+    // cout << "Attribute Height: " << data_real << endl;
 
     
 
 
-    rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "Salary", attributeData);
-    if(rc == RBFM_NULL){
-        cout << "Attribute Salary: " << "NULL" << endl;
-    }
-    memcpy(&data_integer, attributeData, INT_SIZE);
-    cout << "Attribute Salary: " << data_integer << endl;
+    // rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "Salary", attributeData);
+    // if(rc == RBFM_NULL){
+    //     cout << "Attribute Salary: " << "NULL" << endl;
+    // }
+    // memcpy(&data_integer, attributeData, INT_SIZE);
+    // cout << "Attribute Salary: " << data_integer << endl;
 
 
     rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "EmpName", attributeData);
     if(rc == RBFM_NULL){
         cout << "Attribute EmpName: " << "NULL" << endl;
     }
-    char *data_string = (char*) malloc(100);
-    memcpy(data_string, attributeData, 100);
-    cout << "Empname: " << data_string << endl;
+    unsigned string_length;
+    memcpy(&string_length, attributeData, sizeof(unsigned));
 
+    char *data_string = (char*) malloc(string_length);
+    
+    memcpy(data_string, (char*)attributeData + sizeof(unsigned), string_length);
 
+    // data_string[string_length+1] = '\n';
+    for (int i = 0; i < string_length; i++) {
+        printf("%c", ((char*) attributeData + sizeof(unsigned))[i]);
+    }
+    cout << endl;
 
 
     // Given the rid, read the record from file
