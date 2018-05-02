@@ -53,13 +53,13 @@ RC RelationManager::createCatalog()
     int tupleSize = 0;
     void *tuple = malloc(200);
     prepareTable(tableCounter++, "Tables", "Tables.tbl", tuple, &tupleSize, tableDescriptor);
+    RID tablesRID;
+    _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, tablesRID);
 
-    RID tblRID;
-
-
-    _rbf_manager->printRecord(tableDescriptor, tuple);
-    _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, tblRID);
-    _rbf_manager->readRecord(fileHandle, tableDescriptor, tblRID, tuple);
+    prepareTable(tableCounter++, "Columns", "Columns.tbl", tuple, &tupleSize, tableDescriptor);
+    RID columnsRID;
+    _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, columnsRID);
+    _rbf_manager->readRecord(fileHandle, tableDescriptor, columnsRID, tuple);
     _rbf_manager->printRecord(tableDescriptor, tuple);
 
 
@@ -183,9 +183,6 @@ void RelationManager::prepareTable(int table_id, const string &table_name, const
 
   int offset = 0;
 
-  // Null-indicators
-
-  // Null-indicator for the fields
   memcpy((char *)buffer + offset, nullAttributesIndicator, nullAttributesIndicatorActualSize);
   offset += nullAttributesIndicatorActualSize;
 
@@ -201,10 +198,10 @@ void RelationManager::prepareTable(int table_id, const string &table_name, const
   memcpy((char *)buffer + offset, table_name.c_str(), l);
   offset += l;
 
-  const int l2 = 10;
+  const int l2 = sizeof(file_name);
   memcpy((char *)buffer + offset, &l2, sizeof(int));
   offset += sizeof(int);
-  memcpy((char *)buffer + offset, table_name.c_str(), l2);
+  memcpy((char *)buffer + offset, file_name.c_str(), l2);
   offset += l2;
 
   *tupleSize = offset;
