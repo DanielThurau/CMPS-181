@@ -497,68 +497,98 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
 
 // Return attribute value designated by attributeName
 RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data){
-    // may want to write function that just takes a filehandle and rid and return recordEntry
-    RID trueRid = followForwardingAddress(fileHandle, rid);
-
-    // need to get record length with just recordDescriptor,
-    // this forces us to read the record from the page to determine length of varchar
-    void *pageData = malloc(PAGE_SIZE);
-    fileHandle.readPage(trueRid.pageNum, pageData);
-    SlotDirectoryRecordEntry recordEntry = getSlotDirectoryRecordEntry(pageData, trueRid.slotNum);
-
-    // need to get r
-    void *recordData = malloc(recordEntry.length);
-
-    if (readRecord(fileHandle, recordDescriptor, rid, recordData))
-        return RBFM_READ_FAILED;
-
     // grab index of record being read
     int index = -1;
     for (unsigned i = 0; i < recordDescriptor.size(); i++){
         if (recordDescriptor[i].name == attributeName)
             index = i;
     }
-
     if(index == -1)
         return RBFM_ATTRIB_DN_EXIST;
 
-    // check if attribute is null
+    // follow all the forwarding addresses to get to the true location of the record
+    RID trueRid = followForwardingAddress(fileHandle, rid);
+
+    // Retrieve the specific page
+    void * pageData = malloc(PAGE_SIZE);
+    if (fileHandle.readPage(trueRid.pageNum, pageData))
+        return RBFM_READ_FAILED;
+
+    // Checks if the specific slot id exists in the page
+    SlotDirectoryHeader slotHeader = getSlotDirectoryHeader(pageData);
+    
+    if(slotHeader.recordEntriesNumber < trueRid.slotNum)
+        return RBFM_SLOT_DN_EXIST;
+
+    // Gets the slot directory record entry data
+    SlotDirectoryRecordEntry recordEntry = getSlotDirectoryRecordEntry(pageData, trueRid.slotNum);
+
+    // Pointer to start of record
+    char *start = (char*) pageData + recordEntry.offset;
+
+
+
+    // Allocate space for null indicator. The returned null indicator may be larger than
+    // the null indicator in the table has had fields added to it
     int nullIndicatorSize = getNullIndicatorSize(recordDescriptor.size());
     char nullIndicator[nullIndicatorSize];
     memset(nullIndicator, 0, nullIndicatorSize);
-    memcpy(nullIndicator, recordData, nullIndicatorSize);
-    if(fieldIsNull(nullIndicator, index)){
-        data = NULL;
-        free(pageData);
-        free(recordData);
-        return SUCCESS;
+
+    // Get number of columns and size of the null indicator for this record
+    RecordLength len = 0;
+    memcpy (&len, start, sizeof(RecordLength));
+    int recordNullIndicatorSize = getNullIndicatorSize(len);
+
+    // Read in the existing null indicator
+    memcpy (nullIndicator, start + sizeof(RecordLength), recordNullIndicatorSize);
+
+    // If this new recordDescriptor has had fields added to it, we set all of the new fields to null
+    for (unsigned i = len; i < recordDescriptor.size(); i++)
+    {
+        int indicatorIndex = (i+1) / CHAR_BIT;
+        int indicatorMask  = 1 << (CHAR_BIT - 1 - (i % CHAR_BIT));
+        nullIndicator[indicatorIndex] |= indicatorMask;
+    }
+    
+    // data_offset: points to our current place in the output data. We move this forward as we write data to data.
+    // directory_base: points to the start of our directory of indices
+    char *directory_base = start + sizeof(RecordLength) + recordNullIndicatorSize;
+    if (fieldIsNull(nullIndicator, index)){
+        return RBFM_NULL;
+        // continue;
     }
 
-    unsigned offset = attributeOffsetFromIndex(recordData, index, recordDescriptor);
+    // Initialize some offsets
+    // rec_offset: points to data in the record. We move this forward as we read data from our record
+    if(index == 0){
+        unsigned rec_offset = sizeof(RecordLength) + recordNullIndicatorSize + len * sizeof(ColumnOffset);
 
+        ColumnOffset endPointer;
+        memcpy(&endPointer, directory_base + 0 * sizeof(ColumnOffset), sizeof(ColumnOffset));
+        uint32_t fieldSize = endPointer - rec_offset;
 
-    switch (recordDescriptor[index].type){
-        case TypeInt:
-                memcpy(data, (char*)recordData + offset, INT_SIZE);
-            break;
-            case TypeReal:
-                memcpy(data, ((char*) recordData + offset), REAL_SIZE);
-            break;
-            case TypeVarChar:
-                // First VARCHAR_LENGTH_SIZE bytes describe the varchar length
-                uint32_t varcharSize;
-                memcpy(&varcharSize, ((char*) recordData + offset), VARCHAR_LENGTH_SIZE);
-                offset += VARCHAR_LENGTH_SIZE;
-                memcpy(data, ((char*) recordData + offset), varcharSize);
-            break;
+        memcpy((char*) data, start + rec_offset, fieldSize);
+    }else{
+        
+        ColumnOffset startPointer;
+        memcpy(&startPointer, directory_base + (index - 1) * sizeof(ColumnOffset), sizeof(ColumnOffset));
+
+        ColumnOffset endPointer;
+        memcpy(&endPointer, directory_base + index * sizeof(ColumnOffset), sizeof(ColumnOffset));
+
+        uint32_t fieldSize = endPointer - startPointer;
+
+        memcpy((char*) data, start + startPointer, fieldSize);
+
     }
+    
+
 
     free(pageData);
-    free(recordData);
 
 	return SUCCESS;
 }
-
+/*
 // Provided the record descriptor, scan the file.
 RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp,
     const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator){
@@ -567,7 +597,7 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> 
 
     return SUCCESS;
 }
-
+*/
 SlotDirectoryHeader RecordBasedFileManager::getSlotDirectoryHeader(void * page)
 {
     // Getting the slot directory header.
