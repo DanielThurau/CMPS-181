@@ -19,7 +19,7 @@
 #define RBFM_WRITE_FAILED      6
 #define RBFM_SLOT_DN_EXIST     7
 #define RBFM_ATTRIB_DN_EXIST   8
-#define RBFM_SUCCESS_WITH_NULL 9
+#define RBFM_NULL              9
 
 using namespace std;
 

@@ -393,32 +393,40 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
         int indicatorMask  = 1 << (CHAR_BIT - 1 - (i % CHAR_BIT));
         nullIndicator[indicatorIndex] |= indicatorMask;
     }
-    // // Write out null indicator
-    // memcpy(data, nullIndicator, nullIndicatorSize);
-
-    // Initialize some offsets
-    // rec_offset: points to data in the record. We move this forward as we read data from our record
-    unsigned rec_offset = sizeof(RecordLength) + recordNullIndicatorSize + len * sizeof(ColumnOffset);
+    
     // data_offset: points to our current place in the output data. We move this forward as we write data to data.
     // directory_base: points to the start of our directory of indices
     char *directory_base = start + sizeof(RecordLength) + recordNullIndicatorSize;
     if (fieldIsNull(nullIndicator, index)){
-            return RBFM_SUCCESS_WITH_NULL;
-            // continue;
-        }
-    for (unsigned i = 0; i < recordDescriptor.size(); i++)
-    {   
-        // Grab pointer to end of this column
-        ColumnOffset endPointer;
-        memcpy(&endPointer, directory_base + i * sizeof(ColumnOffset), sizeof(ColumnOffset));
+        return RBFM_NULL;
+        // continue;
+    }
 
+    // Initialize some offsets
+    // rec_offset: points to data in the record. We move this forward as we read data from our record
+    if(index == 0){
+        unsigned rec_offset = sizeof(RecordLength) + recordNullIndicatorSize + len * sizeof(ColumnOffset);
+
+        ColumnOffset endPointer;
+        memcpy(&endPointer, directory_base + 0 * sizeof(ColumnOffset), sizeof(ColumnOffset));
         uint32_t fieldSize = endPointer - rec_offset;
 
-        if(i == (unsigned)index){
-            memcpy((char*) data, start + rec_offset, fieldSize);
-        }
-        rec_offset += fieldSize;
+        memcpy((char*) data, start + rec_offset, fieldSize);
+    }else{
+        
+        ColumnOffset startPointer;
+        memcpy(&startPointer, directory_base + (index - 1) * sizeof(ColumnOffset), sizeof(ColumnOffset));
+
+        ColumnOffset endPointer;
+        memcpy(&endPointer, directory_base + index * sizeof(ColumnOffset), sizeof(ColumnOffset));
+
+        uint32_t fieldSize = endPointer - startPointer;
+
+        memcpy((char*) data, start + startPointer, fieldSize);
+
     }
+    
+
 
     free(pageData);
 

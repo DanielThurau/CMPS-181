@@ -49,17 +49,17 @@ RC RelationManager::createCatalog()
     vector<Attribute> tableDescriptor;
     createTableDescriptor(tableDescriptor);
 
-    int nullAttributesIndicatorActualSize = _rbf_manager->getNullIndicatorSize(tableDescriptor.size());
-    unsigned char *nullsIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
-    memset(nullsIndicator, 0, nullAttributesIndicatorActualSize);
-
-    cout << "fuck" << endl;
 
     int tupleSize = 0;
     void *tuple = malloc(200);
-    prepareTable(tableDescriptor.size(), nullsIndicator, tableCounter, "table-name", "file-name", tuple, &tupleSize);
-    tableCounter++;
+    prepareTable(tableCounter++, "Tables", "Tables.tbl", tuple, &tupleSize, tableDescriptor);
 
+    RID tblRID;
+
+
+    _rbf_manager->printRecord(tableDescriptor, tuple);
+    _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, tblRID);
+    _rbf_manager->readRecord(fileHandle, tableDescriptor, tblRID, tuple);
     _rbf_manager->printRecord(tableDescriptor, tuple);
 
 
@@ -176,12 +176,14 @@ void RelationManager::createColumnDescriptor(vector<Attribute> &columnDescriptor
   columnDescriptor.push_back(attr);
 }
 
+void RelationManager::prepareTable(int table_id, const string &table_name, const string &file_name, void *buffer, int *tupleSize, vector<Attribute> &tableDescriptor){
+  int nullAttributesIndicatorActualSize = _rbf_manager->getNullIndicatorSize(tableDescriptor.size());
+  unsigned char *nullAttributesIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
+  memset(nullAttributesIndicator, 0, nullAttributesIndicatorActualSize);
 
-void RelationManager::prepareTable(int attributeCount, unsigned char *nullAttributesIndicator, int table_id, string table_name, string file_name, void *buffer, int *tupleSize){
   int offset = 0;
 
   // Null-indicators
-  int nullAttributesIndicatorActualSize = _rbf_manager->getNullIndicatorSize(attributeCount);
 
   // Null-indicator for the fields
   memcpy((char *)buffer + offset, nullAttributesIndicator, nullAttributesIndicatorActualSize);
@@ -192,10 +194,18 @@ void RelationManager::prepareTable(int attributeCount, unsigned char *nullAttrib
   // e.g., if a tuple consists of four attributes and they are all nulls, then the bit representation will be: [11110000]
   memcpy((char*)buffer + offset, &table_id, 4);
   offset += 4;
-  memcpy((char*)buffer + offset, &table_name, table_name.size());
-  offset += table_name.size();
-  memcpy((char*)buffer + offset, &file_name, file_name.size());
-  offset += file_name.size();
+
+  const int l = sizeof(table_name);
+  memcpy((char *)buffer + offset, &l, sizeof(int));
+  offset += sizeof(int);
+  memcpy((char *)buffer + offset, table_name.c_str(), l);
+  offset += l;
+
+  const int l2 = 10;
+  memcpy((char *)buffer + offset, &l2, sizeof(int));
+  offset += sizeof(int);
+  memcpy((char *)buffer + offset, table_name.c_str(), l2);
+  offset += l2;
 
   *tupleSize = offset;
 

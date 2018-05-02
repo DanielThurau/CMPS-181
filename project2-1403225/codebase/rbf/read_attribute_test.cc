@@ -70,7 +70,7 @@ int RBFTest_8b(RecordBasedFileManager *rbfm) {
 
 
     rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "Age", attributeData);
-    if(rc == RBFM_SUCCESS_WITH_NULL){
+    if(rc == RBFM_NULL){
         cout << "Attribute Age: " << "NULL" << endl;
     }
     uint32_t data_integer;
@@ -81,7 +81,7 @@ int RBFTest_8b(RecordBasedFileManager *rbfm) {
 
 
     rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "Height", attributeData);   
-    if(rc == RBFM_SUCCESS_WITH_NULL){
+    if(rc == RBFM_NULL){
         cout << "Attribute Height: " << "NULL" << endl;
     }
     float data_real;
@@ -92,7 +92,7 @@ int RBFTest_8b(RecordBasedFileManager *rbfm) {
 
 
     rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "Salary", attributeData);
-    if(rc == RBFM_SUCCESS_WITH_NULL){
+    if(rc == RBFM_NULL){
         cout << "Attribute Salary: " << "NULL" << endl;
     }
     memcpy(&data_integer, attributeData, INT_SIZE);
@@ -100,7 +100,7 @@ int RBFTest_8b(RecordBasedFileManager *rbfm) {
 
 
     rc = rbfm->readAttribute(fileHandle, recordDescriptor, rid, "EmpName", attributeData);
-    if(rc == RBFM_SUCCESS_WITH_NULL){
+    if(rc == RBFM_NULL){
         cout << "Attribute EmpName: " << "NULL" << endl;
     }
     char *data_string = (char*) malloc(100);
