@@ -37,13 +37,13 @@ RC RelationManager::createCatalog()
     RC rc;
     rc = _rbf_manager->createFile(tablesFileName);
     if(rc != success){
-      return RBFM_CREATE_FAILED;
+      return rc;
     }
 
     FileHandle fileHandle;
     rc = _rbf_manager->openFile(tablesFileName, fileHandle);
     if(rc != success){
-      return RBFM_OPEN_FAILED;
+      return rc;
     }
 
     vector<Attribute> tableDescriptor;
@@ -51,22 +51,21 @@ RC RelationManager::createCatalog()
 
 
     void *tuple = malloc(200);
+    
     prepareTable(tableCounter++, "Tables", "Tables.tbl", tuple, tableDescriptor);
     RID tablesRID;
     _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, tablesRID);
-
-
-
-
-
-
 
     prepareTable(tableCounter++, "Columns", "Columns.tbl", tuple, tableDescriptor);
     RID columnsRID;
     _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, columnsRID);
 
+    rc = _rbf_manager->closeFile(columnsFileName, fileHandle);
+    if(rc != success){
+      return rc;
+    }
 
-    return -1;
+    return success;
 }
 
 RC RelationManager::deleteCatalog()
@@ -101,6 +100,12 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     
     RID rid;
     _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, rid);
+
+
+
+
+
+
 
 
     return -1;
