@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <climits>
+#include <map>
 #include <inttypes.h>
 #include "../rbf/pfm.h"
 
@@ -43,7 +44,7 @@ struct Attribute {
 };
 
 // Comparison Operator (NOT needed for part 1 of the project)
-typedef enum { EQ_OP = 0, // no condition// = 
+typedef enum { EQ_OP = 0, // = 
            LT_OP,      // <
            LE_OP,      // <=
            GT_OP,      // >
@@ -85,6 +86,9 @@ The scan iterator is NOT required to be implemented for the part 1 of the projec
 //    process the data;
 //  }
 //  rbfmScanIterator.close();
+template <class T>
+bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *value);
+bool checkVarcharMeetsCondition(void *attribute, CompOp compOp, void *value);
 
 class RBFM_ScanIterator;
 
@@ -196,9 +200,17 @@ private:
   void *value;
   vector<string> attributeNames;
 
+  // map from attribute name to attribute struct
+  map<string, Attribute> nameToAttribute;
+  // function pointer to comparison function
+  // gets set to the appropriate function for whatever type conditionAttribute is
+  bool (*compFunc)(void *, CompOp, void *);
+  // the current RID this scanner is pointing at
   RID curRid;
 
   RC updateCurRid();
+  RC projectAttributes(void *data);
+
 public:
   RBFM_ScanIterator();
   ~RBFM_ScanIterator();
