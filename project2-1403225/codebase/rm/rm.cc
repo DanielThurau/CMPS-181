@@ -31,7 +31,6 @@ RelationManager::~RelationManager()
 
 RC RelationManager::createCatalog()
 {
-  cout << "Im being called" << endl;
     /*
       check if these tables exist in the file
     */ 
@@ -77,10 +76,10 @@ RC RelationManager::createCatalog()
     }
 
 
-    // rc = createCatalogColumns(tableID, columnID);
-    // if(rc != success){
-    //   return rc;
-    // }
+    rc = createCatalogColumns(tableID, columnID);
+    if(rc != success){
+      return rc;
+    }
 
 
 
@@ -441,8 +440,8 @@ vector<Attribute> RelationManager::assembleAttributes(void* data){
   RID returnedRID;
   void *returned_data = malloc(66);
   while (scanner.getNextRecord(returnedRID, returned_data) != RBFM_EOF) {
-        cout << "page: " << returnedRID.pageNum << " slot: " << returnedRID.slotNum << endl;
-        _rbf_manager->printRecord(recordDescriptor, returned_data);
+      cout << "page: " << returnedRID.pageNum << " slot: " << returnedRID.slotNum << endl;
+      _rbf_manager->printRecord(recordDescriptor, returned_data);
     }
 
   
