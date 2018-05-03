@@ -104,9 +104,8 @@ RC RBFM_ScanIterator::projectAttributes(void *data) {
     // for each attribute in attributeNames
     for (size_t i = 0; i < attributeNames.size(); i++) {
         RC rc = readAttribute(fileHandle, recordDescriptor, curRid, attributeNames[i], curAttribute);
-        // CHANGE THIS WHEN DAN CHOOSES AN ERROR CODE FOR NULL ATTRIBUTES
         // if retreived attribute is null
-        if (rc == -1) {
+        if (rc == RBFM_NULL) {
             // update null indicator
             ((char *) data)[i / 8] |= 128 >> (i % 8);
         }
@@ -125,7 +124,7 @@ RC RBFM_ScanIterator::projectAttributes(void *data) {
 }
 
 template <class T>
-bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *value) {
+static bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *value) {
     if (compOp == NO_OP) return true;
 
     T attr = *((T*) attribute);
@@ -156,7 +155,7 @@ bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *value) {
     }
 }
 
-bool checkVarcharMeetsCondition(void *attribute, CompOp compOp, void *value) {
+static bool checkVarcharMeetsCondition(void *attribute, CompOp compOp, void *value) {
     if (compOp == NO_OP) return true;
 
     // get attribute and value lengths from first 4 bytes of varchar
