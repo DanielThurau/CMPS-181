@@ -7,12 +7,21 @@
 #include <cstring>
 #include <cstdlib>
 #include <iostream>
-
+#include <inttypes.h>
 #include "../rbf/rbfm.h"
 
 using namespace std;
 
 # define RM_EOF (-1)  // end of a scan operator
+
+
+typedef struct {
+    uint32_t tableID;     // attribute name
+    void*   tableName;     // attribute type
+    void*   fileName; // attribute length
+} Table;
+
+
 
 // RM_ScanIterator is an iteratr to go through tuples
 class RM_ScanIterator {
@@ -83,8 +92,8 @@ private:
   void prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor);
   void prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor);
   RC createCatalogColumns(int tableID, int columnID);
-
-
+  RC getTable(const string &tableName, Table &table);
+  RC breakoutTable(Table &table, void* tableRecord, vector<Attribute> &attrs);
 };
 
 #endif

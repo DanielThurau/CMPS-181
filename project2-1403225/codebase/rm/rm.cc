@@ -31,6 +31,7 @@ RelationManager::~RelationManager()
 
 RC RelationManager::createCatalog()
 {
+  cout << "Im being called" << endl;
     /*
       check if these tables exist in the file
     */ 
@@ -51,6 +52,7 @@ RC RelationManager::createCatalog()
 
 
     void *tuple = malloc(200);
+    void * returned = malloc(200);
 
 
     int tableID = tableCounter++;
@@ -59,9 +61,11 @@ RC RelationManager::createCatalog()
     _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, tablesRID);
 
     int columnID = tableCounter++;
-    prepareTables(tableCounter++, "Columns", "Columns.tbl", tuple, tableDescriptor);
+    prepareTables(columnID, "Columns", "Columns.tbl", tuple, tableDescriptor);
     RID columnsRID;
     _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, columnsRID);
+    _rbf_manager->readRecord(fileHandle, tableDescriptor, columnsRID, returned);
+    _rbf_manager->printRecord(tableDescriptor, returned);
 
     rc = _rbf_manager->closeFile(fileHandle);
     if(rc != success){
@@ -69,10 +73,10 @@ RC RelationManager::createCatalog()
     }
 
 
-    rc = createCatalogColumns(tableID, columnID);
-    if(rc != success){
-      return rc;
-    }
+    // rc = createCatalogColumns(tableID, columnID);
+    // if(rc != success){
+    //   return rc;
+    // }
 
 
 
@@ -129,7 +133,19 @@ RC RelationManager::deleteTable(const string &tableName)
 
 RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &attrs)
 {
-    return -1;
+  RC rc;
+
+  Table table;
+  rc = getTable(tableName, table);
+  if(rc != success){
+    return rc;
+  }
+  
+
+
+
+
+  return success;
 }
 
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid)
@@ -235,20 +251,19 @@ void RelationManager::prepareTables(int table_id, const string &table_name, cons
   // Beginning of the actual data    
   // Note that the left-most bit represents the first field. Thus, the offset is 7 from right, not 0.
   // e.g., if a tuple consists of four attributes and they are all nulls, then the bit representation will be: [11110000]
-  int int_size = sizeof(int);
-  int id_size = int_size;
+  int id_size = sizeof(int);
   memcpy((char*)buffer + offset, &table_id, id_size);
   offset += id_size;
 
-  const int table_name_size = sizeof(table_name);
-  memcpy((char *)buffer + offset, &table_name_size, int_size);
-  offset += int_size;
+  const int table_name_size = table_name.length();
+  memcpy((char *)buffer + offset, &table_name_size, sizeof(int));
+  offset += sizeof(int);
   memcpy((char *)buffer + offset, table_name.c_str(), table_name_size);
   offset += table_name_size;
 
-  const int file_name_size = sizeof(file_name);
-  memcpy((char *)buffer + offset, &file_name_size, int_size);
-  offset += int_size;
+  const int file_name_size =file_name.length();
+  memcpy((char *)buffer + offset, &file_name_size, sizeof(int));
+  offset += sizeof(int);
   memcpy((char *)buffer + offset, file_name.c_str(), file_name_size);
   offset += file_name_size;
 
@@ -269,7 +284,7 @@ void RelationManager::prepareColumns(int table_id, const string &column_name, in
   memcpy((char*)buffer + offset, &table_id, int_size);
   offset += int_size;
 
-  const int column_name_size = sizeof(column_name);
+  const int column_name_size = column_name.length();
   memcpy((char *)buffer + offset, &column_name_size, int_size);
   offset += int_size;
   memcpy((char *)buffer + offset, column_name.c_str(), column_name_size);
@@ -342,4 +357,76 @@ RC RelationManager::createCatalogColumns(int tableID, int columnID){
       return rc;
     }
     return success;
+}
+
+RC RelationManager::getTable(const string &tableName, Table &table){
+    FileHandle fileHandle;
+    RC rc = _rbf_manager->openFile(tablesFileName, fileHandle);
+    if(rc != success){
+      return rc;
+    }
+
+    vector<Attribute> recordDescriptor;
+    createTableDescriptor(recordDescriptor);
+
+    RBFM_ScanIterator scanner;
+
+
+
+    string conditionalValue = tableName;
+
+    string arr[] = {"table-id", "table-name", "file-name"};
+    vector<string> projectionAttributes(arr, arr + sizeof(arr) / sizeof(arr[0]));
+    
+    _rbf_manager->scan(fileHandle, recordDescriptor, "table-name", EQ_OP, &conditionalValue, projectionAttributes, scanner);
+
+
+    RID returnedRID;
+    void *returned_data = malloc(104);
+
+    while (scanner.getNextRecord(returnedRID, returned_data) != RBFM_EOF) {
+        cout << "page: " << returnedRID.pageNum << " slot: " << returnedRID.slotNum << endl;
+        _rbf_manager->printRecord(recordDescriptor, returned_data);
+    }
+    
+     rc = breakoutTable(table, returned_data, recordDescriptor);
+
+    cout << "||" << table.tableID << " " << table.tableName << " " << table.fileName << endl;
+
+
+    return success;
+}
+
+
+RC RelationManager::breakoutTable(Table &table, void* tableRecord, vector<Attribute> &attrs){
+  int nullIndicatorSize = _rbf_manager->getNullIndicatorSize(attrs.size());
+  
+  unsigned offset = nullIndicatorSize;
+
+  table.tableID = *((unsigned *) tableRecord + offset);
+
+  offset += INT_SIZE;
+
+
+  uint32_t varcharSize;
+  memcpy(&varcharSize, ((char*) tableRecord + offset), VARCHAR_LENGTH_SIZE);
+  offset += VARCHAR_LENGTH_SIZE;
+
+  // Gets the actual string.
+  table.tableName = (char*) malloc(varcharSize);
+  if (table.tableName == NULL)
+      return RBFM_MALLOC_FAILED;
+  memcpy(table.tableName, ((char*) tableRecord + offset), varcharSize);
+  offset += varcharSize;
+
+  memcpy(&varcharSize, ((char*) tableRecord + offset), VARCHAR_LENGTH_SIZE);
+  offset += VARCHAR_LENGTH_SIZE;
+
+  // Gets the actual string.
+  table.fileName = (char*) malloc(varcharSize);
+  if (table.fileName == NULL)
+      return RBFM_MALLOC_FAILED;
+  memcpy(table.fileName, ((char*) tableRecord + offset), varcharSize);
+  offset += varcharSize;
+  return success;
 }
