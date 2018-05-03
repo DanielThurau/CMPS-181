@@ -63,6 +63,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             rid = curRid;
             projectAttributes(data);
             updateCurRid();
+            free(attribute)
             return SUCCESS;
         }
         updateCurRid();

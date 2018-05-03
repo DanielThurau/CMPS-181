@@ -86,9 +86,11 @@ private:
   void createColumnDescriptor(vector<Attribute> &columnDescriptor);
   void prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor);
   void prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor);
-  RC createCatalogColumns(int tableID, int columnID);
+  RC createCatalogColumns();
+  RC createCatalogTables();
   RC getTableID(const string &tableName, void* data);
   vector<Attribute> assembleAttributes(void* data);
+  int columnEntry(void *columnRecord, Attribute &entry);
 };
 
 #endif
