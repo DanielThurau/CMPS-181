@@ -56,7 +56,7 @@ int test_delete_record(RecordBasedFileManager *rbfm) {
     free(record_1);
     free(record_2);
 
-    return 0;
+    return rc;
 }
 
 int main()

@@ -63,7 +63,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             rid = curRid;
             projectAttributes(data);
             updateCurRid();
-            free(attribute)
+            free(attribute);
             return SUCCESS;
         }
         updateCurRid();
@@ -125,7 +125,7 @@ RC RBFM_ScanIterator::projectAttributes(void *data) {
 }
 
 template <class T>
-static bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *value) {
+bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *value) {
     if (compOp == NO_OP) return true;
 
     T attr = *((T*) attribute);
@@ -156,7 +156,7 @@ static bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *valu
     }
 }
 
-static bool checkVarcharMeetsCondition(void *attribute, CompOp compOp, void *value) {
+bool checkVarcharMeetsCondition(void *attribute, CompOp compOp, void *value) {
     if (compOp == NO_OP) return true;
 
     // get attribute and value lengths from first 4 bytes of varchar

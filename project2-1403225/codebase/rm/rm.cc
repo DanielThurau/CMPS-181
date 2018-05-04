@@ -1,10 +1,7 @@
 #include "rm.h"
-<<<<<<< HEAD
 #include <cstdio>
 #include <math.h>
-=======
 #include <cmath>
->>>>>>> bb0c3d4d878580aff4756aec645a1361a2ba72f5
 
 const int success = 0;
 RelationManager* RelationManager::_rm = 0;
@@ -551,7 +548,8 @@ vector<Attribute> RelationManager::assembleAttributes(unsigned tableID){
 
 
     while (scanner.getNextRecord(rid, buffer) != RBFM_EOF) {
-      int index = columnEntry(buffer, attribute, projectionAttributes);
+      int index = columnEntry(buffer, attribute, projectionAttributes) - 1;
+      attributes.insert(attributes.begin() + index, attribute);
     }
 
 
