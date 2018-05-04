@@ -13,7 +13,7 @@
 using namespace std;
 
 # define RM_EOF (-1)  // end of a scan operator
-
+#define RM_TABLE_NOT_FOUND 1
 
 
 
@@ -21,12 +21,13 @@ using namespace std;
 // RM_ScanIterator is an iteratr to go through tuples
 class RM_ScanIterator {
 public:
+  RBFM_ScanIterator scanner;
   RM_ScanIterator() {};
   ~RM_ScanIterator() {};
 
   // "data" follows the same format as RelationManager::insertTuple()
-  RC getNextTuple(RID &rid, void *data) { return RM_EOF; };
-  RC close() { return -1; };
+  RC getNextTuple(RID &rid, void *data);
+  RC close();
 };
 
 
@@ -87,8 +88,7 @@ private:
   void prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor);
   void prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor);
   RC createCatalogColumns(int tableID, int columnID);
-  RC getTableID(const string &tableName, void* data);
-  vector<Attribute> assembleAttributes(void* data);
+  RC getTableIDAndFilename (const string tableName, string &filename, unsigned &tableId);
 };
 
 #endif
