@@ -84,23 +84,76 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 
     void *tuple = malloc(200);
     const string fileName = tableName + ".tbl";
-    prepareTables(tableCounter++, tableName, fileName, tuple, tableDescriptor);
+    prepareTables(tableCounter, tableName, fileName, tuple, tableDescriptor);
     
     RID rid;
     _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, rid);
 
+    _rbf_manager->closeFile(fileHandle);
+    rc = _rbf_manager->openFile(columnsFileName, fileHandle);
+    if(rc != success){
+      return RBFM_OPEN_FAILED;
+    }
 
+    vector<Attribute> columnDescriptor;
+    createColumnDescriptor(columnDescriptor);
 
+    for (size_t i = 0; i < attrs.size(); i++) {
+      prepareColumns(
+        tableCounter,
+        attrs[i].name,
+        attrs[i].type,
+        attrs[i].length,
+        i,
+        tuple,
+        columnDescriptor
+      );
+      _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
+    }
 
-
-
-
-    return -1;
+    free(tuple);
+    tableCounter++;
+    _rbf_manager->closeFile(fileHandle);
+    return success;
 }
 
 RC RelationManager::deleteTable(const string &tableName)
 {
-    return -1;
+    string filename;
+    unsigned tableID;
+    getTableIDAndFilename(tableName, filename, tableID);
+
+    _rbf_manager->destroyFile(filename + ".tbl");
+
+    FileHandle fileHandle;
+    _rbf_manager->openFile(tablesFileName, fileHandle);
+
+    vector<Attribute> tableDescriptor;
+    createTableDescriptor(tableDescriptor);
+
+    RBFM_ScanIterator scanner;
+    _rbf_manager->scan(fileHandle, tableDescriptor, "table-id", EQ_OP, &tableID, vector<string>(), scanner);
+    RID rid;
+    scanner.getNextRecord(rid, NULL);
+    scanner.close();
+
+    _rbf_manager->deleteRecord(fileHandle, tableDescriptor, rid);
+    _rbf_manager->closeFile(fileHandle);
+
+    _rbf_manager->openFile(columnsFileName, fileHandle);
+
+    vector<Attribute> columnDescriptor;
+    createColumnDescriptor(columnDescriptor);
+
+    _rbf_manager->scan(fileHandle, columnDescriptor, "table-id", EQ_OP, &tableID, vector<string>(), scanner);
+    while(scanner.getNextRecord(rid, NULL) != RBFM_EOF) {
+      _rbf_manager->deleteRecord(fileHandle, columnDescriptor, rid);
+    }
+    scanner.close();
+
+    _rbf_manager->closeFile(fileHandle);
+
+    return success;
 }
 
 RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &attrs)
@@ -475,7 +528,7 @@ RC RelationManager::getTableIDAndFilename (const string tableName, string &filen
 
     void *conditionName = malloc(tableName.size() + VARCHAR_LENGTH_SIZE);
     *((unsigned*) conditionName) = tableName.size();
-    memcpy((uint8_t*) conditionName + VARCHAR_LENGTH_SIZE, tableName.c_str(), tableName.size);
+    memcpy((uint8_t*) conditionName + VARCHAR_LENGTH_SIZE, tableName.c_str(), tableName.size());
 
     string arr[] = {"table-id", "file-name"};
     vector<string> projectionAttributes(arr, arr + sizeof(arr) / sizeof(arr[0]));

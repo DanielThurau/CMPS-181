@@ -93,6 +93,9 @@ RC RBFM_ScanIterator::updateCurRid() {
 
 // project the attributes in attributeNames from the record pointed to by curRid into data
 RC RBFM_ScanIterator::projectAttributes(void *data) {
+    // if there are no attributes to project, then just return
+    if (attributeNames.size() == 0) return SUCCESS;
+
     // set the null indicator to all 0
     int nullIndicatorSize = getNullIndicatorSize(attributeNames.size());
     memset(data, 0, nullIndicatorSize);
