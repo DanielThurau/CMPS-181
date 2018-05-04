@@ -158,11 +158,50 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid)
 {
+/*
+    // Checking to see if table exists.
+    void* tableID = malloc(INT_SIZE);
+    rc = getTableID(tableName, tableID);
+    if(rc != success){
+      return -1;
+    }
+
+    // string FileName = file-name found in the catalog matching the tableID.-----------------
+    // recordDescriptor is gotten by assembleAttributes
+    fileHandle FileHandle;
+    recordDescriptor RecordDescriptor;
+
+    _rbf_manager->openFile(FileName, FileHandle);
+
+    _rbf_manager->insertRecord(FileHandle, RecordDescriptor, data, RID);
+    _rbf_manager->closeFile(FileHandle);
+*/
     return -1;
 }
 
 RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
 {
+/*
+    // Checking to see if table exists.
+    void* tableID = malloc(INT_SIZE);
+    rc = getTableID(tableName, tableID);
+    if(rc != success){
+      return -1;
+    }
+
+    // Checking to see if a tuple with the RID exists.
+
+    // string FileName = file-name found in the catalog matching the tableID.-----------------
+    // recordDescriptor is gotten by assembleAttributes
+
+    fileHandle FileHandle;
+    recordDescriptor RecordDescriptor;
+
+    _rbf_manager->openFile(FileName, FileHandle);
+
+    _rbf_manager->deleteRecord(FileHandle, RecordDescriptor, data, RID);
+    _rbf_manager->closeFile(FileHandle);
+*/
     return -1;
 }
 
@@ -173,16 +212,58 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
 
 RC RelationManager::readTuple(const string &tableName, const RID &rid, void *data)
 {
+/*
+    // Checking to see if table exists.
+    void* tableID = malloc(INT_SIZE);
+    rc = getTableID(tableName, tableID);
+    if(rc != success){
+      return -1;
+    }
+
+    // Checking to see if a tuple with the RID exists.
+
+    // string FileName = file-name found in the catalog matching the tableID.-----------------
+    // recordDescriptor is gotten by assembleAttributes
+
+    fileHandle FileHandle;
+    recordDescriptor RecordDescriptor;
+
+    _rbf_manager->openFile(FileName, FileHandle);
+
+    _rbf_manager->readRecord(FileHandle, RecordDescriptor, RID, data);
+    _rbf_manager->closeFile(FileHandle);
+*/
     return -1;
 }
 
 RC RelationManager::printTuple(const vector<Attribute> &attrs, const void *data)
 {
-	return -1;
+    _rbf_manager->printRecord(attrs, data);
+    return -1;
 }
 
 RC RelationManager::readAttribute(const string &tableName, const RID &rid, const string &attributeName, void *data)
 {
+/*
+    // Checking to see if table exists.
+    void* tableID = malloc(INT_SIZE);
+    rc = getTableID(tableName, tableID);
+    if(rc != success){
+      return -1;
+    }
+
+    // Checking to see if a tuple with the RID exists.
+
+    // string FileName = file-name found in the catalog matching the tableID.-----------------
+    // recordDescriptor is gotten by assembleAttributes
+
+    fileHandle FileHandle;
+    recordDescriptor RecordDescriptor;
+
+    _rbf_manager->openFile(FileName, FileHandle);
+    _rbf_manager->readAttribute(FileHandle, RecordDescriptor, RID, attributeName, data);
+    _rbf_manager->closeFile(FileHandle);
+*/
     return -1;
 }
 
