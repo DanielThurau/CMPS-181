@@ -104,7 +104,16 @@ Team number : 15
 	RC projectAttributes(void *data):
 		This function projects the attributes in the attributeNames vector from the record pointed to by curRid into data.
 
-	RBFM Functions we added ===================================================================================================
+	RBFM Implementation ======================================================================================================
+
+	RC readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid,
+						const string &attributeName, void *data):
+		This function takes an attributeName and returns the value of that attribute in the provided rid. Grab index/column-position of the attribute. If
+		the rid is a forwarding address, then use followForwardingAddress() to obtain the RID which contains the data. We verify that the slot ID exists
+		in the page and then obtain the data at the corresponding slot record entry. If the value of the attribute is NULL, we return a macro indicating
+		this. Using the nullIndicatorSize, directory_base (pointer to the start of the index directory), and size of the record, we are directed to the
+		beginning of the actual value of the attribute. We read it directly if it is of AttrType TypeInt or TypeReal, or we read the length, then the
+		value if it is of AttrType TypeVarChar.
 
 	int getEmptySlotDirectoryEntry(void *page):
 		This function returns the index of the first empty slot in a page and returns -1 if there are none.
