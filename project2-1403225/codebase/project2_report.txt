@@ -74,7 +74,82 @@ Team number : 15
 6. Implementation Detail
 - Other implementation details goes here.
 
+	RBFM_ScanIterator Implementation ==========================================================================================
+
+	bool (*compFunc)(void *, CompOp, void *):
+		This boolean adopts the elements of the "filter" condition introduced with the RBFM::scan() function and is used to
+		test whether the current record abides by it or not.
+
+	RID curRid: The current RID this scanner is pointing at.
+
+	RC updateCurRid():
+		This function advances the RID forward (as it is used in getNextRecord()). It accommodates the three cases: next record
+		is on the current page, next record is on the next page, and there is no next record.
+
+	RC projectAttributes(void *data):
+		This function projects the attributes in the attributeNames vector from the record pointed to by curRid into data.
+
+	RBFM Functions we added ===================================================================================================
+
+	int getEmptySlotDirectoryEntry(void *page):
+		This function returns the index of the first empty slot in a page and returns -1 if there are none.
+
+	bool canRecordFitInPage(void * page, unsigned recordLength):
+		This function checks to see if a record of length recordLength can fit in a page and also includes a check to see if a new slot directory entry needs
+		to be added.
+
+	RID followForwardingAddress(FileHandle fileHandle, RID startRid):
+		This function follows the forwarding address at the provided RID and returns the RID containing the actual data in the other page.
+
+	RID deleteForwardingAddress(FileHandle fileHandle, RID startRid):
+		This function deletes the forwarding address associated with a record and returns the RID containing the actual data.
 	
+	void deleteSlotDirectoryEntry(void *page, unsigned slotNum):
+		This function deletes the specified entry from a slot directory.
+
+	void removeRecordFromPage(void *page, unsigned slotNum):
+		As mentioned previously, this function empties out the provided slot entry and moves all of the following records back by the length of the deleted
+		record, updating their offset accordingly. Lastly, it updates the free space offset by increasing it by the length of the deleted record.
+
+	unsigned attributeOffsetFromIndex(void *record, unsigned index, const vector<Attribute> &recordDescriptor):
+		This function sets the offset for an attribute based on the attribute type in a switch statement.
+
+	RM_ScanIterator Implementation ============================================================================================
+
+		
+
+	RM Functions we added =====================================================================================================
+
+	void createTableDescriptor(vector<Attribute> &tableDescriptor):
+		This function...
+
+	void createColumnDescriptor(vector<Attribute> &columnDescriptor):
+		This function...
+
+	void prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor):
+		This function...
+
+	void prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer,
+							vector<Attribute> &tableDescriptor);
+		This function...
+
+	RC createCatalogColumns():
+		This function...	
+
+	RC createCatalogTables():
+		This function...
+
+	vector<Attribute> assembleAttributes(unsigned tableID):
+		This function...
+
+	int columnEntry(void *columnRecord, Attribute &entry, vector<string> projectionAttributes);
+		This function...
+
+	int getActualByteForNullsIndicator(int fieldCount);
+		This function...
+
+	RC getTableIDAndFilename (const string tableName, string &filename, unsigned &tableId);
+		This function...
 
 7. Other (optional)
 - Freely use this section to tell us about things that are related to the project 2, but not related to the other sections (optional)
