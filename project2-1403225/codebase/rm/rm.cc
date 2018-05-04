@@ -155,7 +155,6 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid)
 {
-<<<<<<< HEAD
 /*
     // Checking to see if table exists.
     void* tableID = malloc(INT_SIZE);
@@ -174,9 +173,6 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
     _rbf_manager->insertRecord(FileHandle, RecordDescriptor, data, RID);
     _rbf_manager->closeFile(FileHandle);
 */
-=======
-
->>>>>>> 2281fefc5ea0732d4658d15d15369cfcf671084f
     return -1;
 }
 
