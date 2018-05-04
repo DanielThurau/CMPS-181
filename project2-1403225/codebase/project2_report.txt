@@ -1,5 +1,5 @@
 1. Basic information
-Team number (e.g., 01) : 15
+Team number : 15
 #1 Submitter ID : 1403225
 #1 Submitter Name : Morgan Grant
 
@@ -8,10 +8,17 @@ Team number (e.g., 01) : 15
 2. Meta-data
 - Show your meta-data design (Tables and Columns table) and information about each column.
 
+	
 
 3. Internal Record Format
 - Show your record format design and describe how your design satisfies O(1) field access. If not, just mention that your team hasn't implemented this feature.
 
+	Call F the number of fields in the record. The record starts with ceil(F / 8) bytes for a null field indicator. There are then F * 2 bytes for the field
+	directory. Each 2 bytes forms an unsigned 16-bit integer that gives the offset of the end of each field from the start of the fields in the record. After
+	this field directory is all of the field data.
+		To access the k’th field in the record, you would first get the k’th and the k-1’th entry in the field directory. The k-1’th entry gives you the start
+	of the field, and the difference between the k and k-1’th entries gives the length of the field. Use the start and the length to retrieve the field from the
+	record. Since accessing the k’th field does not depend on knowing anything about any of the previous fields, field access is O(1).
 
 - Describe how you store a VarChar field.
 
@@ -19,8 +26,34 @@ Team number (e.g., 01) : 15
 
 - Describe how you deal with an update and delete.
 
+	For updates, we have two main cases: the record stays in the same page, and record does not stay in the same page. If the record stays in the same page, the
+	record is overwritten by its updated version after the records that follow it have been moved and their offsets updated. If the record is not staying on the
+	same page, the record is removed from the page and its slot for the page is emptied. The new record is placed into a page that it will fit into. Back in the
+	original page, a forwarding address to the new RID is left at the old RID. If the RID in the old page already contained a forwarding address, it is overwritten
+	by the new address
+
+	For deletes, the slot entry for the record is emptied and then the record is overwritten by the records that follow it as they are moved back, starting at its
+	offset. If the record being deleted is the last record in the page, then the free space offset is set to the deleted record's offset.
+
+4. Page Format
+- Show your page format design.
+
+	Our page format uses the slot directory method. Starting from the end of the page (byte 4096) we have 4 bytes (4092-4095) to be cast to an unsigned integer
+	representing the number of slots used in the page. The next 4 bytes (4088-4091) are to be cast to unsigned integer that is an offset from the beginning of the
+	page to the start of free space (by our definition free space ranges from that offset to the end of the slot directory).  Whenever a new record needed to be
+	added (determined by our rbfm algorithm) the page is created to contain 4096 bytes, with these values initialized to zero.
+		The slot directory then has an additional N * 8 byte entries that store information about the slots inside the page (where N is the number of slots
+	tracked by the integer at bytes 4092-4096. Each of these entries are split into two four bytes integers that represent the start of the slot (offset from
+	start of page) and length of slot. These slots are what the records are stored in.
+		When a record is inserted, we cycle through existing pages to find one with enough free space to store the record; if none are found, we create a new page.
+	Once the page is selected, we check to see if there is any existing free slots in the page we are inserting the record, otherwise make a new one. In the chosen
+	slot, we insert a reference to the new record in the slot directory, update the slot header, and lastly insert the record. The changes are written back to the
+	page and the insert is complete.
+
+- Describe how you deal with an update and delete.
+
 	For updates, we first consider whether or not there is sufficient space in the record's current page to accommodate the update. If the change in size
-	exceeds the available free space in the record's current page, then we just use insertRecord to add the new updated record, which implicitly finds the best
+	exceeds the available free space in the record's current page, then we just use insertRecord() to add the new updated record, which implicitly finds the best
 	page that can fit it. After inserting, we delete the original record and leave a forwarding address to the new RID in its place. If the record in question
 	was already a forwarding address, then we replace it with the new one.
 		Alternatively, if the change in size of the page is less than the amount of available free space, we move all records that come after it in the page,
@@ -33,19 +66,15 @@ Team number (e.g., 01) : 15
 	then deleted by overwriting it with the successive records and increasing the free space offset by the size of the deleted record.
 		Once the record is deleted, we write the changes back to the page.
 
-4. Page Format
-- Show your page format design.
-- Describe how you deal with an update and delete.
-
-
 5. File Format
 - Show your file format design
 
-
+	
 
 6. Implementation Detail
 - Other implementation details goes here.
 
+	
 
 7. Other (optional)
 - Freely use this section to tell us about things that are related to the project 2, but not related to the other sections (optional)
