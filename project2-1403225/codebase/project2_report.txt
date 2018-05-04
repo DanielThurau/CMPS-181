@@ -3,12 +3,15 @@ Team number : 15
 #1 Submitter ID : 1403225
 #1 Submitter Name : Morgan Grant
 
-WHY IS IT RETURNING .TBL
 
 2. Meta-data
 - Show your meta-data design (Tables and Columns table) and information about each column.
 
-	We created two tables which comprise the system catalog: Tables and Columns.
+	We created two tables which comprise the system catalog: Tables and Columns. We initially check to see if the catalog (or any part of it) already exists.
+	If part of it exists, we error out, since it is corrupted. If the whole thing exists, no work to be done. Otherwise, we proceed to create the catalog.
+		We begin creating the catalog by first setting up the Tables and Columns tables and likewise, inserting both into the Tables table. Once both tables
+	have been created, we add the columns for both into the Columns table, elaborated below.
+
 	The Tables table contains all tables which exist under the database. It contains the following columns:
 		- table-id: 	The identifier for the tables which exist in the database
 		- table-name:	The corresponding name for the table the tuple represents
@@ -19,6 +22,7 @@ WHY IS IT RETURNING .TBL
 		- column-type:		The type of the attribute
 		- column-length:	The length of the attribute
 		- column-position:	The position/index of the column in the table
+
 
 3. Internal Record Format
 - Show your record format design and describe how your design satisfies O(1) field access. If not, just mention that your team hasn't implemented this feature.
@@ -79,7 +83,8 @@ WHY IS IT RETURNING .TBL
 5. File Format
 - Show your file format design
 
-	Our file format is ....  ?!?!@?
+	Our file format is organized with a page directory. Pages in it are created when necessary and ordered sequentially. All pages have a page id, which is used
+	as a component of the record id associated with every record.
 
 6. Implementation Detail
 - Other implementation details goes here.
