@@ -1,7 +1,7 @@
 1. Basic information
-Team number (e.g., 01) : 
-#1 Submitter ID : 
-#1 Submitter Name : 
+Team number (e.g., 01) : 15
+#1 Submitter ID : 1403225
+#1 Submitter Name : Morgan Grant
 
 
 
@@ -11,9 +11,27 @@ Team number (e.g., 01) :
 
 3. Internal Record Format
 - Show your record format design and describe how your design satisfies O(1) field access. If not, just mention that your team hasn't implemented this feature.
+
+
 - Describe how you store a VarChar field.
+
+	We store a VarChar field in two components, as specified: 4 bytes to store the length of the characters, then the list of characters stored.
+
 - Describe how you deal with an update and delete.
 
+	For updates, we first consider whether or not there is sufficient space in the record's current page to accommodate the update. If the change in size
+	exceeds the available free space in the record's current page, then we just use insertRecord to add the new updated record, which implicitly finds the best
+	page that can fit it. After inserting, we delete the original record and leave a forwarding address to the new RID in its place. If the record in question
+	was already a forwarding address, then we replace it with the new one.
+		Alternatively, if the change in size of the page is less than the amount of available free space, we move all records that come after it in the page,
+	then rewrite the offsets in the slot directory accordingly. After that, it updates the record in question and updates the free space offset by the change
+	in size of the page.
+		Once the record is fully updated, we write it back to the page.
+
+	For deletes, we call a separate function removeRecordFromPage(), which is separate since its functionality is utilized in multiple other functions for the
+	RBFM such as updateRecord(). In removeRecordFromPage(), we empty out and delete the slot entry which corresponds to the record to be deleted. The record is
+	then deleted by overwriting it with the successive records and increasing the free space offset by the size of the deleted record.
+		Once the record is deleted, we write the changes back to the page.
 
 4. Page Format
 - Show your page format design.
