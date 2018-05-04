@@ -86,8 +86,7 @@ The scan iterator is NOT required to be implemented for the part 1 of the projec
 //    process the data;
 //  }
 //  rbfmScanIterator.close();
-template <class T>
-bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *value);
+template <class T> bool checkNumberMeetsCondition(void *attribute, CompOp compOp, void *value);
 bool checkVarcharMeetsCondition(void *attribute, CompOp compOp, void *value);
 
 class RBFM_ScanIterator;
