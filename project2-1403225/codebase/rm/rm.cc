@@ -369,6 +369,7 @@ void RelationManager::prepareTables(int table_id, const string &table_name, cons
   memcpy((char *)buffer + offset, file_name.c_str(), file_name_size);
   offset += file_name_size;
 
+  free(nullAttributesIndicator);
 }
 
 void RelationManager::prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor){
@@ -399,6 +400,8 @@ void RelationManager::prepareColumns(int table_id, const string &column_name, in
 
   memcpy((char*)buffer + offset, &column_position, INT_SIZE);
   offset += INT_SIZE;
+
+  free(nullAttributesIndicator);
 }
 
 RC RelationManager::createCatalogTables(){
@@ -448,8 +451,9 @@ RC RelationManager::createCatalogTables(){
     if(rc != success){
       return rc;
     }
-    return success;
 
+    free(buffer);
+    return success;
 }
 
 
@@ -519,6 +523,8 @@ RC RelationManager::createCatalogColumns(){
     if(rc != success){
       return rc;
     }
+
+    free(tuple);
     return success;
 }
 
@@ -607,6 +613,7 @@ vector<Attribute> RelationManager::assembleAttributes(unsigned tableID){
 
     _rbf_manager->closeFile(fileHandle);
 
+    free(buffer);
     return attributes;
 }
 
