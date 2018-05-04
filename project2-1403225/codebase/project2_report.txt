@@ -116,40 +116,44 @@ Team number : 15
 
 	RM_ScanIterator Implementation ============================================================================================
 
-		
+		RM_ScanIterator implements RBFM_ScanIterator entirely. It solely provides an interface at the Relation Manager-level.
 
 	RM Functions we added =====================================================================================================
 
 	void createTableDescriptor(vector<Attribute> &tableDescriptor):
-		This function...
+		This function sets up the attributes for the Tables table in the system catalog.
 
 	void createColumnDescriptor(vector<Attribute> &columnDescriptor):
-		This function...
+		This function sets up the attributes for the Columns table in the system catalog.
 
 	void prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor):
-		This function...
+		This function sets up the Tables table in the system catalog by partitioning the attributes with corresponding lengths and offsets.
 
 	void prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer,
-							vector<Attribute> &tableDescriptor);
-		This function...
-
-	RC createCatalogColumns():
-		This function...	
+							vector<Attribute> &tableDescriptor):
+		This function sets up the Tables table in the system catalog by partitioning the attributes with corresponding lengths and offsets.
 
 	RC createCatalogTables():
-		This function...
+		This function sets up the system catalog tables, Tables and Columns, using the prepareTables() and prepareColumns() methods.
+
+	RC createCatalogColumns():
+		This function sets up the columns for the Tables and Columns tables, using createColumnDescriptor(). The TableDescriptor is created manually.
 
 	vector<Attribute> assembleAttributes(unsigned tableID):
-		This function...
+		This function returns the columnDescriptor (list of attributes) for the provided Table ID.
 
-	int columnEntry(void *columnRecord, Attribute &entry, vector<string> projectionAttributes);
-		This function...
+	int columnEntry(void *columnRecord, Attribute &entry, vector<string> projectionAttributes):
+		This function returns the column position of the entry in the columnRecord provided.
 
-	int getActualByteForNullsIndicator(int fieldCount);
-		This function...
+	int getActualByteForNullsIndicator(int fieldCount):
+		This function calculates the actual number of bytes for the null-indicator for the given field count.
 
-	RC getTableIDAndFilename (const string tableName, string &filename, unsigned &tableId);
-		This function...
+	RC getTableIDAndFilename (const string tableName, string &filename, unsigned &tableId):
+		This function gets the table ID and file of the inquired tableName from the system catalog.
+
+	RC catalogExists():
+		This function is used to check to see if the catalog already exists by checking the existence of the Tables and Columns tables in the system
+		catalog. It is used in createCatalog() in order to know what work must me done regarding its setup.
 
 7. Other (optional)
 - Freely use this section to tell us about things that are related to the project 2, but not related to the other sections (optional)
