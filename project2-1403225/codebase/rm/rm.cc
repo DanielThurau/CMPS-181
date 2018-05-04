@@ -147,7 +147,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
         attrs[i].name,
         attrs[i].type,
         attrs[i].length,
-        i,
+        i + 1,
         tuple,
         columnDescriptor
       );
@@ -157,6 +157,8 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     free(tuple);
     tableCounter++;
     _rbf_manager->closeFile(fileHandle);
+
+    _rbf_manager->createFile(fileName);
     return success;
 }
 
@@ -278,14 +280,17 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
     unsigned tableID;
     RC rc = getTableIDAndFilename(tableName, filename, tableID);
     if(rc != success){
-      return -1;
+      return rc;
     }
     vector<Attribute> recordDescriptor = assembleAttributes(tableID);
 
     FileHandle fileHandle;
     _rbf_manager->openFile(filename, fileHandle);
 
-    _rbf_manager->readRecord(fileHandle, recordDescriptor, rid, data);
+    rc = _rbf_manager->readRecord(fileHandle, recordDescriptor, rid, data);
+    if (rc != success) {
+      return rc;
+    }
     _rbf_manager->closeFile(fileHandle);
 
     return success;
@@ -468,16 +473,14 @@ RC RelationManager::createCatalogTables(){
     RID rid;
 
 
-    int tableID = tableCounter++;
-    prepareTables(tableID, "Tables", "Tables.tbl", buffer, tableDescriptor);
+    prepareTables(1, "Tables", "Tables.tbl", buffer, tableDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, tableDescriptor, buffer, rid);
     if(rc != success){
       _rbf_manager->closeFile(fileHandle);
       return rc;
     }
 
-    int columnID = tableCounter++;
-    prepareTables(columnID, "Columns", "Columns.tbl", buffer, tableDescriptor);
+    prepareTables(2, "Columns", "Columns.tbl", buffer, tableDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, tableDescriptor, buffer, rid);
     if(rc != success){
       _rbf_manager->closeFile(fileHandle);
@@ -489,6 +492,7 @@ RC RelationManager::createCatalogTables(){
       return rc;
     }
 
+    tableCounter = 3;
     free(buffer);
     return success;
 }
@@ -576,7 +580,7 @@ RC RelationManager::getTableIDAndFilename (const string tableName, string &filen
 
     unsigned filenameSize;
     memcpy(&filenameSize, curField, VARCHAR_LENGTH_SIZE);
-    curField += filenameSize;
+    curField += VARCHAR_LENGTH_SIZE;
     char char_filename[filenameSize + 1];
     memcpy(char_filename, curField, filenameSize);
     char_filename[filenameSize] = '\0';
