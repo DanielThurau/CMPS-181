@@ -148,120 +148,110 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     return rc;
   }
   cout << tableID << endl;
-  assembleAttributes(tableID);
+  attrs = assembleAttributes(tableID);
 
   return success;
 }
 
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid)
 {
-/*
-    // Checking to see if table exists.
-    void* tableID = malloc(INT_SIZE);
-    rc = getTableID(tableName, tableID);
+    string filename;
+    unsigned tableID;
+    RC rc = getTableIDAndFilename(tableName, filename, tableID);
     if(rc != success){
       return -1;
     }
+    vector<Attribute> recordDescriptor = assembleAttributes(tableID);
 
-    // string FileName = file-name found in the catalog matching the tableID.-----------------
-    // recordDescriptor is gotten by assembleAttributes
-    fileHandle FileHandle;
-    recordDescriptor RecordDescriptor;
+    FileHandle fileHandle;
+    _rbf_manager->openFile(filename, fileHandle);
 
-    _rbf_manager->openFile(FileName, FileHandle);
+    _rbf_manager->insertRecord(fileHandle, recordDescriptor, data, rid);
+    _rbf_manager->closeFile(fileHandle);
 
-    _rbf_manager->insertRecord(FileHandle, RecordDescriptor, data, RID);
-    _rbf_manager->closeFile(FileHandle);
-*/
-    return -1;
+    return success;
 }
 
 RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
 {
-/*
-    // Checking to see if table exists.
-    void* tableID = malloc(INT_SIZE);
-    rc = getTableID(tableName, tableID);
+    string filename;
+    unsigned tableID;
+    RC rc = getTableIDAndFilename(tableName, filename, tableID);
     if(rc != success){
       return -1;
     }
+    vector<Attribute> recordDescriptor = assembleAttributes(tableID);
 
-    // Checking to see if a tuple with the RID exists.
+    FileHandle fileHandle;
+    _rbf_manager->openFile(filename, fileHandle);
 
-    // string FileName = file-name found in the catalog matching the tableID.-----------------
-    // recordDescriptor is gotten by assembleAttributes
+    _rbf_manager->deleteRecord(fileHandle, recordDescriptor, rid);
+    _rbf_manager->closeFile(fileHandle);
 
-    fileHandle FileHandle;
-    recordDescriptor RecordDescriptor;
-
-    _rbf_manager->openFile(FileName, FileHandle);
-
-    _rbf_manager->deleteRecord(FileHandle, RecordDescriptor, data, RID);
-    _rbf_manager->closeFile(FileHandle);
-*/
-    return -1;
+    return success;
 }
 
 RC RelationManager::updateTuple(const string &tableName, const void *data, const RID &rid)
 {
-    return -1;
+    string filename;
+    unsigned tableID;
+    RC rc = getTableIDAndFilename(tableName, filename, tableID);
+    if(rc != success){
+      return -1;
+    }
+    vector<Attribute> recordDescriptor = assembleAttributes(tableID);
+
+    FileHandle fileHandle;
+    _rbf_manager->openFile(filename, fileHandle);
+
+    _rbf_manager->updateRecord(fileHandle, recordDescriptor, data, rid);
+    _rbf_manager->closeFile(fileHandle);
+
+    return success;
 }
 
 RC RelationManager::readTuple(const string &tableName, const RID &rid, void *data)
 {
-/*
-    // Checking to see if table exists.
-    void* tableID = malloc(INT_SIZE);
-    rc = getTableID(tableName, tableID);
+    string filename;
+    unsigned tableID;
+    RC rc = getTableIDAndFilename(tableName, filename, tableID);
     if(rc != success){
       return -1;
     }
+    vector<Attribute> recordDescriptor = assembleAttributes(tableID);
 
-    // Checking to see if a tuple with the RID exists.
+    FileHandle fileHandle;
+    _rbf_manager->openFile(filename, fileHandle);
 
-    // string FileName = file-name found in the catalog matching the tableID.-----------------
-    // recordDescriptor is gotten by assembleAttributes
+    _rbf_manager->readRecord(fileHandle, recordDescriptor, rid, data);
+    _rbf_manager->closeFile(fileHandle);
 
-    fileHandle FileHandle;
-    recordDescriptor RecordDescriptor;
-
-    _rbf_manager->openFile(FileName, FileHandle);
-
-    _rbf_manager->readRecord(FileHandle, RecordDescriptor, RID, data);
-    _rbf_manager->closeFile(FileHandle);
-*/
-    return -1;
+    return success;
 }
 
 RC RelationManager::printTuple(const vector<Attribute> &attrs, const void *data)
 {
     _rbf_manager->printRecord(attrs, data);
-    return -1;
+    return success;
 }
 
 RC RelationManager::readAttribute(const string &tableName, const RID &rid, const string &attributeName, void *data)
 {
-/*
-    // Checking to see if table exists.
-    void* tableID = malloc(INT_SIZE);
-    rc = getTableID(tableName, tableID);
+    string filename;
+    unsigned tableID;
+    RC rc = getTableIDAndFilename(tableName, filename, tableID);
     if(rc != success){
       return -1;
     }
+    vector<Attribute> recordDescriptor = assembleAttributes(tableID);
 
-    // Checking to see if a tuple with the RID exists.
+    FileHandle fileHandle;
+    _rbf_manager->openFile(filename, fileHandle);
 
-    // string FileName = file-name found in the catalog matching the tableID.-----------------
-    // recordDescriptor is gotten by assembleAttributes
+    _rbf_manager->readAttribute(fileHandle, recordDescriptor, rid, attributeName, data);
+    _rbf_manager->closeFile(fileHandle);
 
-    fileHandle FileHandle;
-    recordDescriptor RecordDescriptor;
-
-    _rbf_manager->openFile(FileName, FileHandle);
-    _rbf_manager->readAttribute(FileHandle, RecordDescriptor, RID, attributeName, data);
-    _rbf_manager->closeFile(FileHandle);
-*/
-    return -1;
+    return success;
 }
 
 RC RelationManager::scan(const string &tableName,
@@ -277,6 +267,7 @@ RC RelationManager::scan(const string &tableName,
   FileHandle fileHandle;
   _rbf_manager->openFile(filename, fileHandle);
   vector<Attribute> recordDescriptor = assembleAttributes(tableID);
+  rm_ScanIterator._rbf_manager = *_rbf_manager;
 
   rm_ScanIterator.scanner.init(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames);
   return success;
@@ -490,6 +481,7 @@ RC RelationManager::getTableIDAndFilename (const string tableName, string &filen
     char_filename[filenameSize] = '\0';
     filename = string(char_filename);
 
+    _rbf_manager->closeFile(fileHandle);
     free(returnedData);
     free(conditionName);
     return success;
@@ -500,7 +492,8 @@ RM_ScanIterator::RM_ScanIterator() {
 }
 
 RM_ScanIterator::~RM_ScanIterator() {
-
+  scanner.close();
+  _rbf_manager.closeFile(fileHandle);
 }
 
 RC RM_ScanIterator::getNextTuple(RID &rid, void *data) {
@@ -509,7 +502,6 @@ RC RM_ScanIterator::getNextTuple(RID &rid, void *data) {
 }
 
 RC RM_ScanIterator::close() {
-  scanner.close();
   delete this;
   return success;
 }
