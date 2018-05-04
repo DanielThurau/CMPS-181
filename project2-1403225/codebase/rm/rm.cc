@@ -286,7 +286,7 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
 
     FileHandle fileHandle;
     _rbf_manager->openFile(filename, fileHandle);
-
+    
     rc = _rbf_manager->readRecord(fileHandle, recordDescriptor, rid, data);
     if (rc != success) {
       return rc;
@@ -315,7 +315,8 @@ RC RelationManager::readAttribute(const string &tableName, const RID &rid, const
     FileHandle fileHandle;
     _rbf_manager->openFile(filename, fileHandle);
 
-    _rbf_manager->readAttribute(fileHandle, recordDescriptor, rid, attributeName, data);
+    rc =_rbf_manager->readAttribute(fileHandle, recordDescriptor, rid, attributeName, data);
+    cout << rc << endl;
     _rbf_manager->closeFile(fileHandle);
 
     return success;
