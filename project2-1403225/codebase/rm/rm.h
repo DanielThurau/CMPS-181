@@ -21,9 +21,12 @@ using namespace std;
 // RM_ScanIterator is an iteratr to go through tuples
 class RM_ScanIterator {
 public:
+  FileHandle fileHandle;
   RBFM_ScanIterator scanner;
-  RM_ScanIterator() {};
-  ~RM_ScanIterator() {};
+  RecordBasedFileManager _rbf_manager;
+  
+  RM_ScanIterator();
+  ~RM_ScanIterator();
 
   // "data" follows the same format as RelationManager::insertTuple()
   RC getNextTuple(RID &rid, void *data);
@@ -85,9 +88,17 @@ private:
 
   void createTableDescriptor(vector<Attribute> &tableDescriptor);
   void createColumnDescriptor(vector<Attribute> &columnDescriptor);
+  
   void prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor);
   void prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor);
-  RC createCatalogColumns(int tableID, int columnID);
+
+  RC createCatalogColumns();
+  RC createCatalogTables();
+  
+  vector<Attribute> assembleAttributes(unsigned tableID);
+  int columnEntry(void *columnRecord, Attribute &entry, vector<string> projectionAttributes);
+  
+  int getActualByteForNullsIndicator(int fieldCount);
   RC getTableIDAndFilename (const string tableName, string &filename, unsigned &tableId);
 };
 

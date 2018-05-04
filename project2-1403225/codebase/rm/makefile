@@ -59,6 +59,9 @@ rm_test_dan: rm_test_dan.o librm.a $(CODEROOT)/rbf/librbf.a
 $(CODEROOT)/rbf/librbf.a:
 	$(MAKE) -C $(CODEROOT)/rbf librbf.a
 
+.PHONY: ct
+ct:
+	rm Tables.tbl Columns.tbl
 
 .PHONY: clean
 clean:

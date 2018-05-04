@@ -63,6 +63,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
             rid = curRid;
             projectAttributes(data);
             updateCurRid();
+            free(attribute)
             return SUCCESS;
         }
         updateCurRid();
@@ -452,7 +453,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         // form a forwarding address
         SlotDirectoryRecordEntry forwardingAddress;
         forwardingAddress.length = newRid.slotNum;
-        forwardingAddress.offset = -newRid.pageNum; // COME BACK TO THIS.-------------
+        forwardingAddress.offset = -newRid.pageNum;
 
         // if this record has already been forwarded, then update its original forwarding address
         if (rid.pageNum != trueRid.pageNum) {
