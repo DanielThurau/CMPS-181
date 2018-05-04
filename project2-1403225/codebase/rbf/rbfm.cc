@@ -570,11 +570,27 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
     
     // directory_base: points to the start of our directory of indices
     unsigned data_offset = 0;
-    char *directory_base = start + sizeof(RecordLength) + recordNullIndicatorSize;
+    
+    int nullSize = getNullIndicatorSize(1);
+    char nullI[nullSize];
+    memset(nullI, 0, nullSize);
+
+    
+
+
+    
     if (fieldIsNull(nullIndicator, index)){
-        return RBFM_NULL;
+        nullI[1] |= 128;
+        memcpy((char*)data + data_offset, nullI, 1);
+        return SUCCESS;
         // continue;
     }
+
+    memcpy((char*)data + data_offset, nullI, 1);
+    data_offset+=1;
+
+    char *directory_base = start + sizeof(RecordLength) + recordNullIndicatorSize;
+
 
     // Initialize some offsets
     // rec_offset: points to data in the record. We move this forward as we read data from our record
