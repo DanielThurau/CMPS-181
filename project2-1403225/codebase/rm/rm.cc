@@ -1,5 +1,6 @@
 #include "rm.h"
 #include <cstdio>
+#include <math.h>
 
 const int success = 0;
 RelationManager* RelationManager::_rm = 0;
@@ -106,18 +107,13 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
   RC rc;
 
   // get the ID of the table we need to getAttib from
-  void* tableID = malloc(INT_SIZE);
+  unsigned tableID;
 
   // passing the table and reference to our var, returns a tableID
   rc = getTableID(tableName, tableID);
   if(rc != success){
     return rc;
   }
-
-  //TODO remove this
-  cout << *((unsigned *)tableID) << endl;
-  //ENDTODO
-
   // assemble a vector of attributes
   assembleAttributes(tableID);
 
@@ -220,7 +216,7 @@ void RelationManager::createColumnDescriptor(vector<Attribute> &columnDescriptor
 
 void RelationManager::prepareTables(int table_id, const string &table_name, const string &file_name, void *buffer, vector<Attribute> &tableDescriptor){
 
-  int nullAttributesIndicatorActualSize = _rbf_manager->getNullIndicatorSize(tableDescriptor.size());
+  int nullAttributesIndicatorActualSize = getActualByteForNullsIndicator(tableDescriptor.size());
   unsigned char *nullAttributesIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
   memset(nullAttributesIndicator, 0, nullAttributesIndicatorActualSize);
 
@@ -251,8 +247,8 @@ void RelationManager::prepareTables(int table_id, const string &table_name, cons
 
 void RelationManager::prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor){
 
-  int nullAttributesIndicatorActualSize = _rbf_manager->getNullIndicatorSize(tableDescriptor.size());
-  unsigned char *nullAttributesIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize);
+  int nullAttributesIndicatorActualSize = getActualByteForNullsIndicator(tableDescriptor.size());
+  unsigned char *nullAttributesIndicator = (unsigned char *) malloc(nullAttributesIndicatorActualSize); // 8 bits with p/d sizeof()
   memset(nullAttributesIndicator, 0, nullAttributesIndicatorActualSize);
 
   int offset = 0;
@@ -332,6 +328,8 @@ RC RelationManager::createCatalogTables(){
 
 
 
+
+
 RC RelationManager::createCatalogColumns(){
     RC rc;
     rc = _rbf_manager->createFile(columnsFileName);
@@ -398,7 +396,9 @@ RC RelationManager::createCatalogColumns(){
     return success;
 }
 
-RC RelationManager::getTableID(const string &tableName, void* data){
+
+
+RC RelationManager::getTableID(const string &tableName, unsigned &data){
 
     // 
     FileHandle fileHandle;
@@ -438,9 +438,10 @@ RC RelationManager::getTableID(const string &tableName, void* data){
     if(scanner.getNextRecord(returnedRID, returned_data) == RBFM_EOF){
       return -1;
     }
-    offset = _rbf_manager->getNullIndicatorSize(3);
-    memcpy(data, ((char*) returned_data + offset), INT_SIZE);
-
+    // magic number do not fuck with
+    offset = getActualByteForNullsIndicator(3);
+    memcpy(&data, ((char*) returned_data + offset), INT_SIZE);
+    cout << data << endl;
     rc = _rbf_manager->closeFile(fileHandle);
     if(rc != success){
       return rc;
@@ -450,12 +451,9 @@ RC RelationManager::getTableID(const string &tableName, void* data){
 }
 
 
-vector<Attribute> RelationManager::assembleAttributes(void* data){
+vector<Attribute> RelationManager::assembleAttributes(unsigned tableID){
     // set of attributes to be returned
     vector<Attribute> attributes;
-    // The tqable id we are grabbing the attributes of
-    unsigned tableID =  *((unsigned *) data);
-
     // file handle for the columnTables
     FileHandle fileHandle;
     _rbf_manager->openFile(columnsFileName, fileHandle);
@@ -479,14 +477,16 @@ vector<Attribute> RelationManager::assembleAttributes(void* data){
     RID rid;
     // attribute to be populated by a 
     Attribute attribute;
-    void *buffer = malloc(100);
+    void *buffer = malloc(500);
 
 
     while (scanner.getNextRecord(rid, buffer) != RBFM_EOF) {
-      cout << "page: " << rid.pageNum << " slot: " << rid.slotNum << endl;
-      _rbf_manager->printRecord(tableDescriptor, buffer);
-      _rbf_manager->printRecord(columnDescriptor, buffer);
-      // columnEntry(returned_data, attribute);
+      int index = columnEntry(buffer, attribute, projectionAttributes) - 1;
+      if((unsigned)index == attributes.size()){
+        unsigned extend = (unsigned)index - attributes.size();
+        attributes.resize(extend);
+      }
+      attributes.insert(attributes.begin() + index - 1, attribute);
     }
 
 
@@ -495,64 +495,46 @@ vector<Attribute> RelationManager::assembleAttributes(void* data){
     return attributes;
 }
 
-// int RelationManager::columnEntry(void *columnRecord, Attribute &entry){
-//     int offset = 0;
-//     cout << "here" << endl;
+int RelationManager::columnEntry(void *columnRecord, Attribute &entry, vector<string> projectionAttributes){
+    int offset = getActualByteForNullsIndicator(projectionAttributes.size());
 
-//     /*
-//       struct Attribute {
-//         string   name;     // attribute name
-//         AttrType type;     // attribute type
-//         AttrLength length; // attribute length
-//       };
-//     */
-
-//     uint32_t varcharSize;
-//     memcpy(&varcharSize, ((char*) columnRecord + offset), VARCHAR_LENGTH_SIZE);
-//     offset += VARCHAR_LENGTH_SIZE;
-//     memcpy(&entry.name, ((char*) columnRecord + offset), varcharSize);
-//     offset += varcharSize;
-
-//     for (unsigned i = 0; i < varcharSize; i++) {
-//         printf("%c", entry.name[i]);
-//     }
-//     cout << endl;
-
-//     return -1;
-// }
+    /*
+      struct Attribute {
+        string   name;     // attribute name
+        AttrType type;     // attribute type
+        AttrLength length; // attribute length
+      };
+    */
 
 
+    uint32_t varcharSize;
+    memcpy(&varcharSize, ((char*) columnRecord + offset), VARCHAR_LENGTH_SIZE);
+    offset += VARCHAR_LENGTH_SIZE;
+    char buffer[varcharSize + 1];
 
-// case TypeInt:
-//                 uint32_t data_integer;
-//                 memcpy(&data_integer, ((char*) data + offset), INT_SIZE);
-//                 offset += INT_SIZE;
 
-//                 cout << "" << data_integer << endl;
-//             break;
-//             case TypeReal:
-//                 float data_real;
-//                 memcpy(&data_real, ((char*) data + offset), REAL_SIZE);
-//                 offset += REAL_SIZE;
+    for (unsigned i = 0; i < varcharSize; i++) {
+        buffer[i] = ((char*)columnRecord + offset)[i];
+        
+    }
+    offset+=varcharSize;
+    buffer[varcharSize] = '\0';
+    entry.name = string(buffer);
+    
+    memcpy(&entry.type, ((char*) columnRecord + offset), INT_SIZE);
+    offset += INT_SIZE;
 
-//                 cout << "" << data_real << endl;
-//             break;
-//             case TypeVarChar:
-//                 // First VARCHAR_LENGTH_SIZE bytes describe the varchar length
-//                 uint32_t varcharSize;
-//                 memcpy(&varcharSize, ((char*) data + offset), VARCHAR_LENGTH_SIZE);
-//                 offset += VARCHAR_LENGTH_SIZE;
+    memcpy(&entry.length, ((char*) columnRecord + offset), INT_SIZE);
+    offset += INT_SIZE;
 
-//                 // Gets the actual string.
-//                 char *data_string = (char*) malloc(varcharSize + 1);
-//                 if (data_string == NULL)
-//                     return RBFM_MALLOC_FAILED;
-//                 memcpy(data_string, ((char*) data + offset), varcharSize);
+    int column_position;
+    memcpy(&column_position, ((char*) columnRecord + offset), INT_SIZE);
 
-//                 // Adds the string terminator.
-//                 data_string[varcharSize] = '\0';
-//                 offset += varcharSize;
+    return column_position;
+}
 
-//                 cout << data_string << endl;
-//                 free(data_string);
-//             break;
+// Calculate actual bytes for nulls-indicator for the given field counts
+int RelationManager::getActualByteForNullsIndicator(int fieldCount) {
+  return ceil((double) fieldCount / CHAR_BIT);
+}
+

@@ -88,9 +88,10 @@ private:
   void prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor);
   RC createCatalogColumns();
   RC createCatalogTables();
-  RC getTableID(const string &tableName, void* data);
-  vector<Attribute> assembleAttributes(void* data);
-  int columnEntry(void *columnRecord, Attribute &entry);
+  RC getTableID(const string &tableName, unsigned &data);
+  vector<Attribute> assembleAttributes(unsigned tableID);
+  int columnEntry(void *columnRecord, Attribute &entry, vector<string> projectionAttributes);
+  int getActualByteForNullsIndicator(int fieldCount);
 };
 
 #endif
