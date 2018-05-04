@@ -93,6 +93,9 @@ RC RBFM_ScanIterator::updateCurRid() {
 
 // project the attributes in attributeNames from the record pointed to by curRid into data
 RC RBFM_ScanIterator::projectAttributes(void *data) {
+    // if there are no attributes to project, then just return
+    if (attributeNames.size() == 0) return SUCCESS;
+
     // set the null indicator to all 0
     int nullIndicatorSize = getNullIndicatorSize(attributeNames.size());
     memset(data, 0, nullIndicatorSize);
@@ -602,16 +605,8 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<At
 
 	return SUCCESS;
 }
-/*
-// Provided the record descriptor, scan the file.
-RC RecordBasedFileManager::scan(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const string &conditionAttribute, const CompOp compOp,
-    const void *value, const vector<string> &attributeNames, RBFM_ScanIterator &rbfm_ScanIterator){
 
-    rbfm_ScanIterator.init(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames);
 
-    return SUCCESS;
-}
-*/
 SlotDirectoryHeader RecordBasedFileManager::getSlotDirectoryHeader(void * page)
 {
     // Getting the slot directory header.
