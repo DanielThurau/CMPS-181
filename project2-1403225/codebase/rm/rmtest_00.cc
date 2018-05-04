@@ -24,7 +24,7 @@ RC TEST_RM_0(const string &tableName)
 int main()
 {
     // Get Attributes
-    RC rcmain = TEST_RM_0("Tables");
+    RC rcmain = TEST_RM_0("tbl_employee");
 
     return rcmain;
 }
