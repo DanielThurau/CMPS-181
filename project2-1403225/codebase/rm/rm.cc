@@ -1,4 +1,5 @@
 #include "rm.h"
+#include <cmath>
 
 const int success = 0;
 RelationManager* RelationManager::_rm = 0;
@@ -139,25 +140,22 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 {
   RC rc;
 
-  void* tableID = malloc(INT_SIZE);
+  string filename;
+  unsigned tableID;
 
-  rc = getTableID(tableName, tableID);
-  if(rc != success){
+  rc = getTableIDAndFilename(tableName, filename, tableID);
+  if(rc != success) {
     return rc;
   }
-  cout << *((unsigned *)tableID) << endl;
+  cout << tableID << endl;
   assembleAttributes(tableID);
-
-  
-
-
-
 
   return success;
 }
 
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid)
 {
+
     return -1;
 }
 
@@ -193,7 +191,15 @@ RC RelationManager::scan(const string &tableName,
       const vector<string> &attributeNames,
       RM_ScanIterator &rm_ScanIterator)
 {
-    return -1;
+  string filename;
+  unsigned tableID;
+  getTableIDAndFilename(tableName, filename, tableID);
+  FileHandle fileHandle;
+  _rbf_manager->openFile(filename, fileHandle);
+  vector<Attribute> recordDescriptor = assembleAttributes(tableID);
+
+  rm_ScanIterator.scanner.init(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames);
+  return success;
 }
 
 void RelationManager::createTableDescriptor(vector<Attribute> &tableDescriptor){
@@ -213,14 +219,13 @@ void RelationManager::createTableDescriptor(vector<Attribute> &tableDescriptor){
   attr.type = TypeVarChar;
   attr.length = (AttrLength)50;
   tableDescriptor.push_back(attr);
-
 }
+
 void RelationManager::createColumnDescriptor(vector<Attribute> &columnDescriptor){
   // Columns(table-id:int, column-name:varchar(50), 
   // column-type:int, column-length:int, column-position:int) 
   Attribute attr;
-  attr.name = "table-id";
-  attr.type = TypeInt;
+  attr.name = "table-id"; attr.type = TypeInt;
   attr.length = (AttrLength)4;
   columnDescriptor.push_back(attr);
 
@@ -367,84 +372,64 @@ RC RelationManager::createCatalogColumns(int tableID, int columnID){
     return success;
 }
 
-RC RelationManager::getTableID(const string &tableName, void* data){
+RC RelationManager::getTableIDAndFilename (const string tableName, string &filename, unsigned &tableId) {
+    RBFM_ScanIterator scanner;
+
+    void *conditionName = malloc(tableName.size() + VARCHAR_LENGTH_SIZE);
+    *((unsigned*) conditionName) = tableName.size();
+    memcpy((uint8_t*) conditionName + VARCHAR_LENGTH_SIZE, tableName.c_str(), tableName.size);
+
+    string arr[] = {"table-id", "file-name"};
+    vector<string> projectionAttributes(arr, arr + sizeof(arr) / sizeof(arr[0]));
+    
     FileHandle fileHandle;
-    RC rc = _rbf_manager->openFile(tablesFileName, fileHandle);
-    if(rc != success){
-      return rc;
-    }
+    _rbf_manager->openFile(tablesFileName, fileHandle);
 
     vector<Attribute> recordDescriptor;
     createTableDescriptor(recordDescriptor);
 
-    RBFM_ScanIterator scanner;
+    _rbf_manager->scan(fileHandle, recordDescriptor, "table-name", EQ_OP, conditionName, projectionAttributes, scanner);
 
-
-    void *buffer = malloc(50);
-    int offset = 0;
-
-    string conditionalValue = tableName;
-    const unsigned conditionalValueSize = conditionalValue.length();
-    memcpy((char *)buffer + offset, &conditionalValueSize, sizeof(int));
-    offset += sizeof(int);
-    memcpy((char *)buffer + offset, conditionalValue.c_str(), conditionalValueSize);
-
-
-
-
-
-    string arr[] = {"table-id"};
-    vector<string> projectionAttributes(arr, arr + sizeof(arr) / sizeof(arr[0]));
-    
-    _rbf_manager->scan(fileHandle, recordDescriptor, "table-name", EQ_OP, buffer, projectionAttributes, scanner);
-
-
-    RID returnedRID;
-    void *returned_data = malloc(4);
-
-    if(scanner.getNextRecord(returnedRID, returned_data) == RBFM_EOF){
-      return -1;
-    }
-    offset = _rbf_manager->getNullIndicatorSize(3);
-    memcpy(data, ((char*) returned_data + offset), INT_SIZE);
-
-    rc = _rbf_manager->closeFile(fileHandle);
-    if(rc != success){
-      return rc;
+    void *returnedData = malloc(128);
+    RID rid;
+    if (scanner.getNextRecord(rid, returnedData) == RM_EOF) {
+      cout << "getTableIdAndFilename: table '" << tableName << "' not found" << endl;
+      return RM_TABLE_NOT_FOUND;
     }
 
+    int numNullBytes = int(ceil((double) projectionAttributes.size() / CHAR_BIT));
+    char *curField = (char *) returnedData + numNullBytes;
+    memcpy(&tableId, curField, INT_SIZE);
+    curField += INT_SIZE;
+
+    unsigned filenameSize;
+    memcpy(&filenameSize, curField, VARCHAR_LENGTH_SIZE);
+    curField += filenameSize;
+    char char_filename[filenameSize + 1];
+    memcpy(char_filename, curField, filenameSize);
+    char_filename[filenameSize] = '\0';
+    filename = string(char_filename);
+
+    free(returnedData);
+    free(conditionName);
     return success;
 }
 
+RM_ScanIterator::RM_ScanIterator() {
+  scanner = RBFM_ScanIterator();
+}
 
-vector<Attribute> RelationManager::assembleAttributes(void* data){
-  vector<Attribute> attributes;
-  FileHandle fileHandle;
-  RC rc = _rbf_manager->openFile(columnsFileName, fileHandle);
-  // if(rc != success){
-  //   return rc;
-  // }
+RM_ScanIterator::~RM_ScanIterator() {
 
-  vector<Attribute> recordDescriptor;
-  createColumnDescriptor(recordDescriptor);
+}
 
-  RBFM_ScanIterator scanner;
+RC RM_ScanIterator::getNextTuple(RID &rid, void *data) {
+  RC retval = scanner.getNextRecord(rid, data);
+  return retval == RBFM_EOF ? RM_EOF : retval;
+}
 
-
-  unsigned tableID =  *((unsigned *) data);
-  string arr[] = {"column-name", "column-type", "column-length", "column-position"};
-  vector<string> projectionAttributes(arr, arr + sizeof(arr) / sizeof(arr[0]));
-  
-  _rbf_manager->scan(fileHandle, recordDescriptor, "table-id", EQ_OP, &tableID, projectionAttributes, scanner);
-
-
-  RID returnedRID;
-  void *returned_data = malloc(66);
-  while (scanner.getNextRecord(returnedRID, returned_data) != RBFM_EOF) {
-        cout << "page: " << returnedRID.pageNum << " slot: " << returnedRID.slotNum << endl;
-        _rbf_manager->printRecord(recordDescriptor, returned_data);
-    }
-
-  
-    return attributes;
+RC RM_ScanIterator::close() {
+  scanner.close();
+  delete this;
+  return success;
 }
