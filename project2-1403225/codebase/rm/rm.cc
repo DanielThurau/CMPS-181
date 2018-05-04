@@ -20,9 +20,52 @@ RelationManager::RelationManager()
 
   tablesFileName = "Tables.tbl";
   columnsFileName = "Columns.tbl";
-  tableCounter = 1;
 
-  createCatalog();
+  RC rc = catalogExists();
+
+  if(rc == RM_CATALOG_DNE){
+      tableCounter = 1;
+      RC rc = createCatalog();
+      if(rc != success){
+        rc = RM_CATALOG_CREATION_FAILED;
+      }
+  }else if(rc == RM_CATALOG_EXISTS){
+      tableCounter = 1;
+      int tempID;
+      RBFM_ScanIterator scanner;
+
+      string arr[] = {"table-id"};
+      vector<string> projectionAttributes(arr, arr + sizeof(arr) / sizeof(arr[0]));
+
+      FileHandle fileHandle;
+      _rbf_manager->openFile(tablesFileName, fileHandle);
+
+      vector<Attribute> recordDescriptor;
+      createTableDescriptor(recordDescriptor);
+
+      _rbf_manager->scan(fileHandle, recordDescriptor, "", NO_OP, NULL, projectionAttributes, scanner);
+
+      void *returnedData = malloc(128);
+      RID rid;
+
+      while (scanner.getNextRecord(rid, returnedData) != RBFM_EOF) {
+          int offset = getActualByteForNullsIndicator(projectionAttributes.size());
+          memcpy(&tempID, (char*)returnedData + offset, INT_SIZE);
+          if(tempID > tableCounter){
+            tableCounter = tempID;
+          }
+      }
+
+
+      free(returnedData);
+      _rbf_manager->closeFile(fileHandle);
+
+
+  }else{
+    // cant return from a function
+    rc =  RM_CATALOG_CORRUPTED;
+  }
+
 
 
 
@@ -84,23 +127,76 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 
     void *tuple = malloc(200);
     const string fileName = tableName + ".tbl";
-    prepareTables(tableCounter++, tableName, fileName, tuple, tableDescriptor);
+    prepareTables(tableCounter, tableName, fileName, tuple, tableDescriptor);
     
     RID rid;
     _rbf_manager->insertRecord(fileHandle, tableDescriptor, tuple, rid);
 
+    _rbf_manager->closeFile(fileHandle);
+    rc = _rbf_manager->openFile(columnsFileName, fileHandle);
+    if(rc != success){
+      return RBFM_OPEN_FAILED;
+    }
 
+    vector<Attribute> columnDescriptor;
+    createColumnDescriptor(columnDescriptor);
 
+    for (size_t i = 0; i < attrs.size(); i++) {
+      prepareColumns(
+        tableCounter,
+        attrs[i].name,
+        attrs[i].type,
+        attrs[i].length,
+        i,
+        tuple,
+        columnDescriptor
+      );
+      _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
+    }
 
-
-
-
-    return -1;
+    free(tuple);
+    tableCounter++;
+    _rbf_manager->closeFile(fileHandle);
+    return success;
 }
 
 RC RelationManager::deleteTable(const string &tableName)
 {
-    return -1;
+    string filename;
+    unsigned tableID;
+    getTableIDAndFilename(tableName, filename, tableID);
+
+    _rbf_manager->destroyFile(filename + ".tbl");
+
+    FileHandle fileHandle;
+    _rbf_manager->openFile(tablesFileName, fileHandle);
+
+    vector<Attribute> tableDescriptor;
+    createTableDescriptor(tableDescriptor);
+
+    RBFM_ScanIterator scanner;
+    _rbf_manager->scan(fileHandle, tableDescriptor, "table-id", EQ_OP, &tableID, vector<string>(), scanner);
+    RID rid;
+    scanner.getNextRecord(rid, NULL);
+    scanner.close();
+
+    _rbf_manager->deleteRecord(fileHandle, tableDescriptor, rid);
+    _rbf_manager->closeFile(fileHandle);
+
+    _rbf_manager->openFile(columnsFileName, fileHandle);
+
+    vector<Attribute> columnDescriptor;
+    createColumnDescriptor(columnDescriptor);
+
+    _rbf_manager->scan(fileHandle, columnDescriptor, "table-id", EQ_OP, &tableID, vector<string>(), scanner);
+    while(scanner.getNextRecord(rid, NULL) != RBFM_EOF) {
+      _rbf_manager->deleteRecord(fileHandle, columnDescriptor, rid);
+    }
+    scanner.close();
+
+    _rbf_manager->closeFile(fileHandle);
+
+    return success;
 }
 
 RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &attrs)
@@ -114,7 +210,6 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
   if(rc != success) {
     return rc;
   }
-  cout << tableID << endl;
   attrs = assembleAttributes(tableID);
 
   return success;
@@ -316,6 +411,7 @@ void RelationManager::prepareTables(int table_id, const string &table_name, cons
   memcpy((char *)buffer + offset, file_name.c_str(), file_name_size);
   offset += file_name_size;
 
+  free(nullAttributesIndicator);
 }
 
 void RelationManager::prepareColumns(int table_id, const string &column_name, int column_type, int column_length, int column_position, void *buffer, vector<Attribute> &tableDescriptor){
@@ -346,6 +442,8 @@ void RelationManager::prepareColumns(int table_id, const string &column_name, in
 
   memcpy((char*)buffer + offset, &column_position, INT_SIZE);
   offset += INT_SIZE;
+
+  free(nullAttributesIndicator);
 }
 
 RC RelationManager::createCatalogTables(){
@@ -366,37 +464,33 @@ RC RelationManager::createCatalogTables(){
     vector<Attribute> tableDescriptor;
     createTableDescriptor(tableDescriptor);
 
-
-    void *buffer = malloc(200);
+    void *buffer = malloc(150);
     RID rid;
-
-    cout << "\nInserting system catalouge tables" << endl;
 
 
     int tableID = tableCounter++;
     prepareTables(tableID, "Tables", "Tables.tbl", buffer, tableDescriptor);
-    _rbf_manager->insertRecord(fileHandle, tableDescriptor, buffer, rid);
-
-    // TODO STODUT CHECK
-    _rbf_manager->readRecord(fileHandle, tableDescriptor, rid, buffer);
-    _rbf_manager->printRecord(tableDescriptor, buffer);
-    // END TODO
+    rc = _rbf_manager->insertRecord(fileHandle, tableDescriptor, buffer, rid);
+    if(rc != success){
+      _rbf_manager->closeFile(fileHandle);
+      return rc;
+    }
 
     int columnID = tableCounter++;
     prepareTables(columnID, "Columns", "Columns.tbl", buffer, tableDescriptor);
-    _rbf_manager->insertRecord(fileHandle, tableDescriptor, buffer, rid);
-    
-    // TODO STODUT CHECK
-    _rbf_manager->readRecord(fileHandle, tableDescriptor, rid, buffer);
-    _rbf_manager->printRecord(tableDescriptor, buffer);
-    // END TODO
+    rc = _rbf_manager->insertRecord(fileHandle, tableDescriptor, buffer, rid);
+    if(rc != success){
+      _rbf_manager->closeFile(fileHandle);
+      return rc;
+    }
 
     rc = _rbf_manager->closeFile(fileHandle);
     if(rc != success){
       return rc;
     }
-    return success;
 
+    free(buffer);
+    return success;
 }
 
 
@@ -420,52 +514,33 @@ RC RelationManager::createCatalogColumns(){
     createColumnDescriptor(columnDescriptor);
 
 
-    void *tuple = malloc(200);
+    void *tuple = malloc(100);
     RID rid;
 
-    cout << "\nInserting system catalouge columns" << endl;
-    
-    // TODO
-    // redo so its not hardcoded
-    // remove read and print, its verified 
     prepareColumns(1, "table-id", TypeInt, 4, 1, tuple, columnDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
-    rc = _rbf_manager->readRecord(fileHandle, columnDescriptor, rid, tuple);
-    _rbf_manager->printRecord(columnDescriptor, tuple);
     prepareColumns(1, "table-name", TypeVarChar, 50, 2, tuple, columnDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
-    rc = _rbf_manager->readRecord(fileHandle, columnDescriptor, rid, tuple);
-    _rbf_manager->printRecord(columnDescriptor, tuple);
     prepareColumns(1, "file-name", TypeVarChar, 50, 3, tuple, columnDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
-    rc = _rbf_manager->readRecord(fileHandle, columnDescriptor, rid, tuple);
-    _rbf_manager->printRecord(columnDescriptor, tuple);
     prepareColumns(2, "table-id", TypeInt, 4, 1, tuple, columnDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
-    rc = _rbf_manager->readRecord(fileHandle, columnDescriptor, rid, tuple);
-    _rbf_manager->printRecord(columnDescriptor, tuple);
     prepareColumns(2, "column-name", TypeVarChar, 50, 2, tuple, columnDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
-    rc = _rbf_manager->readRecord(fileHandle, columnDescriptor, rid, tuple);
-    _rbf_manager->printRecord(columnDescriptor, tuple);
     prepareColumns(2, "column-type", TypeInt, 4, 3, tuple, columnDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
-    rc = _rbf_manager->readRecord(fileHandle, columnDescriptor, rid, tuple);
-    _rbf_manager->printRecord(columnDescriptor, tuple);
     prepareColumns(2, "column-length", TypeInt, 4, 4, tuple, columnDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
-    rc = _rbf_manager->readRecord(fileHandle, columnDescriptor, rid, tuple);
-    _rbf_manager->printRecord(columnDescriptor, tuple);
     prepareColumns(2, "column-position", TypeInt, 4, 5, tuple, columnDescriptor);
     rc = _rbf_manager->insertRecord(fileHandle, columnDescriptor, tuple, rid);
-    rc = _rbf_manager->readRecord(fileHandle, columnDescriptor, rid, tuple);
-    _rbf_manager->printRecord(columnDescriptor, tuple);
 
     
     rc = _rbf_manager->closeFile(fileHandle);
     if(rc != success){
       return rc;
     }
+
+    free(tuple);
     return success;
 }
 
@@ -475,7 +550,7 @@ RC RelationManager::getTableIDAndFilename (const string tableName, string &filen
 
     void *conditionName = malloc(tableName.size() + VARCHAR_LENGTH_SIZE);
     *((unsigned*) conditionName) = tableName.size();
-    memcpy((uint8_t*) conditionName + VARCHAR_LENGTH_SIZE, tableName.c_str(), tableName.size);
+    memcpy((uint8_t*) conditionName + VARCHAR_LENGTH_SIZE, tableName.c_str(), tableName.size());
 
     string arr[] = {"table-id", "file-name"};
     vector<string> projectionAttributes(arr, arr + sizeof(arr) / sizeof(arr[0]));
@@ -491,7 +566,6 @@ RC RelationManager::getTableIDAndFilename (const string tableName, string &filen
     void *returnedData = malloc(128);
     RID rid;
     if (scanner.getNextRecord(rid, returnedData) == RM_EOF) {
-      cout << "getTableIdAndFilename: table '" << tableName << "' not found" << endl;
       return RM_TABLE_NOT_FOUND;
     }
 
@@ -535,16 +609,11 @@ vector<Attribute> RelationManager::assembleAttributes(unsigned tableID){
     // assembleAttributs match on the tableID
     _rbf_manager->scan(fileHandle, columnDescriptor, "table-id", EQ_OP, &tableID, projectionAttributes, scanner);
 
-    
-    
-
     // rid returned from getNextRecord
     RID rid;
     // attribute to be populated by a 
     Attribute attribute;
     void *buffer = malloc(500);
-
-
 
     while (scanner.getNextRecord(rid, buffer) != RBFM_EOF) {
       int index = columnEntry(buffer, attribute, projectionAttributes) - 1;
@@ -554,20 +623,12 @@ vector<Attribute> RelationManager::assembleAttributes(unsigned tableID){
 
     _rbf_manager->closeFile(fileHandle);
 
+    free(buffer);
     return attributes;
 }
 
 int RelationManager::columnEntry(void *columnRecord, Attribute &entry, vector<string> projectionAttributes){
     int offset = getActualByteForNullsIndicator(projectionAttributes.size());
-
-    /*
-      struct Attribute {
-        string   name;     // attribute name
-        AttrType type;     // attribute type
-        AttrLength length; // attribute length
-      };
-    */
-
 
     uint32_t varcharSize;
     memcpy(&varcharSize, ((char*) columnRecord + offset), VARCHAR_LENGTH_SIZE);
@@ -594,6 +655,36 @@ int RelationManager::columnEntry(void *columnRecord, Attribute &entry, vector<st
 
     return column_position;
 }
+
+RC RelationManager::catalogExists(){
+    FileHandle fileHandleTable;
+    FileHandle fileHandleColumn;
+    RC rc1;
+    RC rc2;
+
+    rc1 = _rbf_manager->openFile(tablesFileName, fileHandleTable);
+    rc2 = _rbf_manager->openFile(columnsFileName, fileHandleColumn);
+
+    if(rc1 == PFM_FILE_DN_EXIST && rc2 == PFM_FILE_DN_EXIST){
+        return RM_CATALOG_DNE;
+    }else if(rc1 == PFM_FILE_DN_EXIST){
+        return RM_SYS_TABLE_EXISTS;
+    }else if(rc2 == PFM_FILE_DN_EXIST){
+        return RM_SYS_COLUMN_EXISTS;
+    }else{
+        return RM_CATALOG_EXISTS;
+    }
+
+    _rbf_manager->closeFile(fileHandleTable);
+    _rbf_manager->closeFile(fileHandleColumn);
+
+    return RM_CATALOG_DNE;
+
+
+
+}
+
+
 
 // Calculate actual bytes for nulls-indicator for the given field counts
 int RelationManager::getActualByteForNullsIndicator(int fieldCount) {
