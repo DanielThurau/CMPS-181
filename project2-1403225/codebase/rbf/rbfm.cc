@@ -338,7 +338,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     // Checks if the specific slot id exists in the page
     SlotDirectoryHeader slotHeader = getSlotDirectoryHeader(pageData);
     
-    if(slotHeader.recordEntriesNumber < trueRid.slotNum)
+    if(slotHeader.recordEntriesNumber <= trueRid.slotNum)
         return RBFM_SLOT_DN_EXIST;
 
     // Gets the slot directory record entry data
@@ -943,6 +943,7 @@ void RecordBasedFileManager::removeRecordFromPage(void *page, unsigned slotNum) 
 
     // update free space offset
     slotHeader.freeSpaceOffset += recordEntry.length;
+    slotHeader.recordEntriesNumber--;
     setSlotDirectoryHeader(page, slotHeader);
 }
 
