@@ -13,9 +13,14 @@
 using namespace std;
 
 # define RM_EOF (-1)  // end of a scan operator
-#define RM_TABLE_NOT_FOUND 1
 
-
+#define RM_TABLE_NOT_FOUND   1
+#define RM_CATALOG_CORRUPTED 2
+#define RM_SYS_TABLE_EXISTS  3
+#define RM_SYS_COLUMN_EXISTS 4
+#define RM_CATALOG_EXISTS      5
+#define RM_CATALOG_CREATION_FAILED 6
+#define RM_CATALOG_DNE 7
 
 
 // RM_ScanIterator is an iteratr to go through tuples
@@ -23,7 +28,7 @@ class RM_ScanIterator {
 public:
   FileHandle fileHandle;
   RBFM_ScanIterator scanner;
-  RecordBasedFileManager _rbf_manager;
+  static RecordBasedFileManager _rbf_manager;
   
   RM_ScanIterator();
   ~RM_ScanIterator();
@@ -100,6 +105,9 @@ private:
   
   int getActualByteForNullsIndicator(int fieldCount);
   RC getTableIDAndFilename (const string tableName, string &filename, unsigned &tableId);
+
+  
+  RC catalogExists();
 };
 
 #endif

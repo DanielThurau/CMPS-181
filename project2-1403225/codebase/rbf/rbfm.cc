@@ -216,8 +216,9 @@ RecordBasedFileManager::~RecordBasedFileManager()
 
 RC RecordBasedFileManager::createFile(const string &fileName) {
     // Creating a new paged file.
-    if (_pf_manager->createFile(fileName))
-        return RBFM_CREATE_FAILED;
+    RC rc = _pf_manager->createFile(fileName);
+    if (rc)
+        return rc;
 
     // Setting up the first page.
     void * firstPageData = calloc(PAGE_SIZE, 1);
