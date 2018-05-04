@@ -3,12 +3,22 @@ Team number : 15
 #1 Submitter ID : 1403225
 #1 Submitter Name : Morgan Grant
 
-
+WHY IS IT RETURNING .TBL
 
 2. Meta-data
 - Show your meta-data design (Tables and Columns table) and information about each column.
 
-	
+	We created two tables which comprise the system catalog: Tables and Columns.
+	The Tables table contains all tables which exist under the database. It contains the following columns:
+		- table-id: 	The identifier for the tables which exist in the database
+		- table-name:	The corresponding name for the table the tuple represents
+		- file-name:	File which contains the corresponding table
+	The Columns table contains all of the attributes that exist for every table in the database. It contains the following columns:
+		- table-id:			The table that the column-tuple corresponds to
+		- column-name:		The name of the attribute
+		- column-type:		The type of the attribute
+		- column-length:	The length of the attribute
+		- column-position:	The position/index of the column in the table
 
 3. Internal Record Format
 - Show your record format design and describe how your design satisfies O(1) field access. If not, just mention that your team hasn't implemented this feature.
@@ -26,13 +36,13 @@ Team number : 15
 
 - Describe how you deal with an update and delete.
 
-	For updates, we have two main cases: the record stays in the same page, and record does not stay in the same page. If the record stays in the same page, the
+	For updateRecord(), we have two main cases: the record stays in the same page, and record does not stay in the same page. If the record stays in the same page, the
 	record is overwritten by its updated version after the records that follow it have been moved and their offsets updated. If the record is not staying on the
 	same page, the record is removed from the page and its slot for the page is emptied. The new record is placed into a page that it will fit into. Back in the
 	original page, a forwarding address to the new RID is left at the old RID. If the RID in the old page already contained a forwarding address, it is overwritten
 	by the new address
 
-	For deletes, the slot entry for the record is emptied and then the record is overwritten by the records that follow it as they are moved back, starting at its
+	For deleteRecord(), the slot entry for the record is emptied and then the record is overwritten by the records that follow it as they are moved back, starting at its
 	offset. If the record being deleted is the last record in the page, then the free space offset is set to the deleted record's offset.
 
 4. Page Format
@@ -69,7 +79,7 @@ Team number : 15
 5. File Format
 - Show your file format design
 
-	
+	Our file format is ....  ?!?!@?
 
 6. Implementation Detail
 - Other implementation details goes here.
