@@ -23,7 +23,6 @@ class RM_ScanIterator {
 public:
   FileHandle fileHandle;
   RBFM_ScanIterator scanner;
-  RecordBasedFileManager _rbf_manager;
   
   RM_ScanIterator();
   ~RM_ScanIterator();

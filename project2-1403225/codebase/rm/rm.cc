@@ -234,7 +234,6 @@ RC RelationManager::scan(const string &tableName,
     FileHandle fileHandle;
     _rbf_manager->openFile(filename, fileHandle);
     vector<Attribute> recordDescriptor = assembleAttributes(tableID);
-    rm_ScanIterator._rbf_manager = *_rbf_manager;
 
     rm_ScanIterator.scanner.init(fileHandle, recordDescriptor, conditionAttribute, compOp, value, attributeNames);
     return success;
@@ -607,7 +606,7 @@ RM_ScanIterator::RM_ScanIterator() {
 
 RM_ScanIterator::~RM_ScanIterator() {
   scanner.close();
-  _rbf_manager.closeFile(fileHandle);
+  RecordBasedFileManager::instance()->closeFile(fileHandle);
 }
 
 RC RM_ScanIterator::getNextTuple(RID &rid, void *data) {
