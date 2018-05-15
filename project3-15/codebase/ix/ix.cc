@@ -2,6 +2,7 @@
 #include "ix.h"
 
 IndexManager* IndexManager::_index_manager = 0;
+PagedFileManager *IndexManager::_pf_manager = NULL;
 
 IndexManager* IndexManager::instance()
 {
@@ -13,6 +14,8 @@ IndexManager* IndexManager::instance()
 
 IndexManager::IndexManager()
 {
+    // Initialize the internal PagedFileManager instance
+    _pf_manager = PagedFileManager::instance();
 }
 
 IndexManager::~IndexManager()
@@ -21,22 +24,42 @@ IndexManager::~IndexManager()
 
 RC IndexManager::createFile(const string &fileName)
 {
-    return -1;
+    // Creating a new paged file.
+    if (_pf_manager->createFile(fileName))
+        return IX_CREATE_FAILED;
+
+    // Setting up the first page.
+    void * firstPageData = calloc(PAGE_SIZE, 1);
+    if (firstPageData == NULL)
+        return IX_MALLOC_FAILED;
+    newLeafBasedPage(firstPageData);
+
+    // Adds the first record based page.
+    IXFileHandle handle;
+    if (_pf_manager->openFile(fileName.c_str(), *handle.fileHandle))
+        return IX_OPEN_FAILED;
+    if (handle.appendPage(firstPageData))
+        return IX_APPEND_FAILED;
+    _pf_manager->closeFile(*handle.fileHandle);
+
+    free(firstPageData);
+
+    return SUCCESS;
 }
 
 RC IndexManager::destroyFile(const string &fileName)
 {
-    return -1;
+    return _pf_manager->destroyFile(fileName);
 }
 
 RC IndexManager::openFile(const string &fileName, IXFileHandle &ixfileHandle)
 {
-    return -1;
+    return _pf_manager->openFile(fileName.c_str(), *ixfileHandle.fileHandle);
 }
 
 RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
 {
-    return -1;
+    return _pf_manager->closeFile(*ixfileHandle.fileHandle);
 }
 
 RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
@@ -63,6 +86,25 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
 }
+
+
+void IndexManager::newLeafBasedPage(void *page){
+    memset(page, 0, PAGE_SIZE);
+    IndexDirectory indexDirectory;
+    indexDirectory.numEntries = 0;
+    indexDirectory.freeSpaceOffset = sizeof(IndexDirectory);
+    indexDirectory.statusIndicator = LEAF_PAGE;
+    memcpy(page, &indexDirectory, sizeof(IndexDirectory));
+}
+
+
+
+
+
+
+
+
+
 
 IX_ScanIterator::IX_ScanIterator()
 {

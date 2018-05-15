@@ -3,10 +3,31 @@
 
 #include <vector>
 #include <string>
+#include <cstring>
 
 #include "../rbf/rbfm.h"
 
 #define IX_EOF (-1)  // end of the index scan
+
+#define SUCCESS 0
+
+#define IX_CREATE_FAILED  1
+#define IX_MALLOC_FAILED  2
+#define IX_OPEN_FAILED    3
+#define IX_APPEND_FAILED  4
+#define IX_READ_FAILED    5
+#define IX_WRITE_FAILED   6
+
+#define LEAF_PAGE         0
+#define BRANCH_PAGE       1 
+
+typedef struct IndexDirectory{
+    uint32_t numEntries;
+    uint32_t freeSpaceOffset;
+    uint8_t statusIndicator;
+} IndexDirectory;
+
+
 
 class IX_ScanIterator;
 class IXFileHandle;
@@ -46,12 +67,18 @@ class IndexManager {
         // Print the B+ tree in pre-order (in a JSON record format)
         void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const;
 
+
+
     protected:
         IndexManager();
         ~IndexManager();
 
     private:
         static IndexManager *_index_manager;
+        static PagedFileManager *_pf_manager;
+
+
+        void newLeafBasedPage(void *page);
 };
 
 
