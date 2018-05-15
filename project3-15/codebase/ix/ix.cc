@@ -88,14 +88,52 @@ IXFileHandle::IXFileHandle()
     ixReadPageCounter = 0;
     ixWritePageCounter = 0;
     ixAppendPageCounter = 0;
+
+    FileHandle *fileHandle = new FileHandle();
+
 }
 
 IXFileHandle::~IXFileHandle()
 {
+    fileHandle->~FileHandle();
+    free(fileHandle);
 }
 
 RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
 {
-    return -1;
+    readPageCount = ixReadPageCounter;
+    writePageCount = ixWritePageCounter;
+    appendPage = ixAppendPageCounter;
+    return success;
 }
 
+RC IXFileHandle::readPage(PageNum pageNum, void *data){
+    RC rc = fileHandle->readPage(pageNum, data);
+    if(rc){
+        return -1;
+    }
+    ixReadPageCounter++;
+    return success;
+}
+
+RC IXFileHandle::writePage(PageNum pageNum, const void *data){
+    RC rc = fileHandle->writePage(pageNum, data);
+    if(rc){
+        return -1;
+    }
+    ixWritePageCounter++;
+    return success;
+}   
+
+RC IXFileHandle::appendPage(const void *data){
+    RC rc = fileHandle->appendPage(pageNum, data);
+    if(rc){
+        return -1;
+    }
+    ixAppendPageCounter++;
+    return success;
+}   
+
+unsigned IXFileHandle::getNumberOfPages(){
+    return fileHandle->getNumberOfPages();
+}

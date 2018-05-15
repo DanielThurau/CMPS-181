@@ -67,6 +67,7 @@ public:
 
     // Let PagedFileManager access our private helper methods
     friend class PagedFileManager;
+    friend class IXFileHandle;
 
 private:
     FILE *_fd;

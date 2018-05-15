@@ -76,19 +76,23 @@ class IX_ScanIterator {
 class IXFileHandle {
     public:
 
-    // variables to keep counter for each operation
-    unsigned ixReadPageCounter;
-    unsigned ixWritePageCounter;
-    unsigned ixAppendPageCounter;
+        // variables to keep counter for each operation
+        unsigned ixReadPageCounter;
+        unsigned ixWritePageCounter;
+        unsigned ixAppendPageCounter;
 
-    // Constructor
-    IXFileHandle();
+        // Constructor
+        IXFileHandle();
 
-    // Destructor
-    ~IXFileHandle();
+        // Destructor
+        ~IXFileHandle();
 
-	// Put the current counter values of associated PF FileHandles into variables
-	RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);
+    	// Put the current counter values of associated PF FileHandles into variables
+    	RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);
+        RC readPage(PageNum pageNum, void *data);                           // Get a specific page
+        RC writePage(PageNum pageNum, const void *data);                    // Write a specific page
+        RC appendPage(const void *data);                                    // Append a specific page
+        unsigned getNumberOfPages();
 
 };
 
