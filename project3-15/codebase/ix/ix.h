@@ -54,6 +54,22 @@ class IndexManager {
         static IndexManager *_index_manager;
 };
 
+// Non-leaf nodes in the B+ tree.
+class branch {
+
+    vector<unsigned> child;
+    unsigned parent;
+    void *entry;
+
+}
+
+// Leaf nodes in the B+ tree.
+class leaf {
+
+    unsigned parent;
+    void* entry;
+
+}
 
 class IX_ScanIterator {
     public:
