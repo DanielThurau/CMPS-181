@@ -33,30 +33,32 @@ typedef struct IndexDirectory {
 // Struct for leaf page sibling references
 // -1 indicated null reference if furthest 
 // left/right sibling
-typedef struct LeafDirectory {
+typedef struct FamilyDirectory {
+    PageNum parent;
     int32_t leftSibling;
     int32_t rightSibling;
-} LeafDirectory;
+} FamilyDirectory;
 
 class InteriorNode {
 public:
-    InteriorNode(const void *page, Attribute &attribute);
+    InteriorNode(const void *page, const Attribute &attribute);
     RC writeToPage(void *page, Attribute &attribute);
 
+    IndexDirectory  indexDirectory;
+    FamilyDirectory familyDirectory;
+
     vector<void *> trafficCops;
-    vector<uint32_t> pagePointers;
-    uint32_t numEntries;
-    uint32_t freeSpaceOffset;
+    vector<PageNum> pagePointers;
+
 };
 
 class LeafNode {
 public:
-    LeafNode(const void *page, Attribute &attribute);
+    LeafNode(const void *page, const Attribute &attribute);
     RC writeToPage(void *page, Attribute &attribute);
 
-    uint32_t numEntries;
-    uint32_t freeSpaceOffset;
-    LeafDirectory siblings;
+    IndexDirectory  indexDirectory;
+    FamilyDirectory familyDirectory;
 
     vector<void*> keys;
     vector<RID> rids;
@@ -112,13 +114,13 @@ class IndexManager {
         static PagedFileManager *_pf_manager;
 
 
-        void newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling);
-        void newInteriorBasedPage(void *page);
+        void newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent);
+        void newInteriorBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent);
 
         void getIndexDirectory(const void *page, IndexDirectory &directory);
         void setIndexDirectory(void *page, IndexDirectory &directory);
-        void getLeafDirectory(const void *page, LeafDirectory &directory);
-        void setLeafDirectory(void *page, LeafDirectory &directory);
+        void getFamilyDirectory(const void *page, FamilyDirectory &directory);
+        void setFamilyDirectory(void *page, FamilyDirectory &directory);
 };
 
 

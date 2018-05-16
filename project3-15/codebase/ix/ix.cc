@@ -32,7 +32,8 @@ RC IndexManager::createFile(const string &fileName)
     void * firstPageData = calloc(PAGE_SIZE, 1);
     if (firstPageData == NULL)
         return IX_MALLOC_FAILED;
-    newLeafBasedPage(firstPageData, -1, -1);
+    // create the root
+    newLeafBasedPage(firstPageData, -1, -1, 0);
 
     // Adds the first record based page.
     IXFileHandle handle;
@@ -88,31 +89,38 @@ void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attri
 }
 
 
-void IndexManager::newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling){
+void IndexManager::newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent){
     memset(page, 0, PAGE_SIZE);
     
     IndexDirectory indexDirectory;
     indexDirectory.numEntries = 0;
-    indexDirectory.freeSpaceOffset = sizeof(IndexDirectory) + sizeof(LeafDirectory);
+    indexDirectory.freeSpaceOffset = sizeof(IndexDirectory) + sizeof(FamilyDirectory);
     indexDirectory.type = LEAF_NODE;
 
-    LeafDirectory leafDirectory;
-    leafDirectory.leftSibling = leftSibling;
-    leafDirectory.rightSibling = rightSibling;
+    FamilyDirectory familyDirectory;
+    familyDirectory.parent = parent;    
+    familyDirectory.leftSibling = leftSibling;
+    familyDirectory.rightSibling = rightSibling;
 
     setIndexDirectory(page, indexDirectory);
-    setLeafDirectory(page, leafDirectory);
+    setFamilyDirectory(page, familyDirectory);
 }
 
-void IndexManager::newInteriorBasedPage(void *page){
+void IndexManager::newInteriorBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent){
     memset(page, 0, PAGE_SIZE);
 
     IndexDirectory indexDirectory;
     indexDirectory.numEntries = 0;
     indexDirectory.freeSpaceOffset = sizeof(IndexDirectory);
     indexDirectory.type = INTERIOR_NODE;
-    
+
+    FamilyDirectory familyDirectory;
+    familyDirectory.parent = parent;    
+    familyDirectory.leftSibling = leftSibling;
+    familyDirectory.rightSibling = rightSibling;
+
     setIndexDirectory(page, indexDirectory);
+    setFamilyDirectory(page, familyDirectory);
 }
 
 void IndexManager::setIndexDirectory(void *page, IndexDirectory &directory) {
@@ -123,11 +131,11 @@ void IndexManager::getIndexDirectory(const void *page, IndexDirectory &directory
     memcpy(&directory, page, sizeof(directory));
 }
 
-void IndexManager::setLeafDirectory(void *page, LeafDirectory &directory) {
+void IndexManager::setFamilyDirectory(void *page, FamilyDirectory &directory) {
     memcpy((uint8_t*) page + sizeof(IndexDirectory), &directory, sizeof(directory));
 }
 
-void IndexManager::getLeafDirectory(const void *page, LeafDirectory &directory) {
+void IndexManager::getFamilyDirectory(const void *page, FamilyDirectory &directory) {
     memcpy(&directory, (uint8_t*) page + sizeof(IndexDirectory), sizeof(directory));
 }
 
@@ -205,25 +213,23 @@ unsigned IXFileHandle::getNumberOfPages(){
     return fileHandle->getNumberOfPages();
 }
 
-InteriorNode::InteriorNode(const void *page, Attribute &attribute) {
+InteriorNode::InteriorNode(const void *page, const Attribute &attribute) {
     IndexManager *im = IndexManager::instance();
 
-    IndexDirectory directory;
-    im->getIndexDirectory(page, directory);
-
-    numEntries = directory.numEntries;
-    freeSpaceOffset = directory.freeSpaceOffset;
+    im->getIndexDirectory(page, indexDirectory);
+    // set the leafDirectory public variable
+    im->getFamilyDirectory(page, familyDirectory);
 
     // pointer to current point in page
-    uint8_t *cur_offset = (uint8_t*) page + sizeof(directory);
+    uint8_t *cur_offset = (uint8_t*) page + sizeof(indexDirectory) + sizeof(familyDirectory);
     // copy page pointers out of page
-    for (uint32_t i = 0; i < numEntries + 1; i++) {
+    for (uint32_t i = 0; i < indexDirectory.numEntries + 1; i++) {
         pagePointers.push_back( *((uint32_t*) cur_offset) );
         cur_offset += sizeof(uint32_t);
     }
 
     // copy traffic cops out of page
-    for (uint32_t i = 0; i < numEntries; i++) {
+    for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
         // alloc an extra byte so that adding the null plug to a varchar won't overflow
         void *value = malloc(attribute.length + 1);
         switch (attribute.type) {
@@ -236,13 +242,10 @@ InteriorNode::InteriorNode(const void *page, Attribute &attribute) {
         case TypeVarChar:
             uint32_t varchar_length;
             memcpy(&varchar_length, cur_offset, VARCHAR_LENGTH_SIZE);
-            // move past length so length isn't included when we copy
-            cur_offset += VARCHAR_LENGTH_SIZE;
-            memcpy(value, cur_offset, varchar_length);
+            memcpy(value, cur_offset, varchar_length + VARCHAR_LENGTH_SIZE);
             // add null plug to varchar to make it into a c string
-            ((char*) value)[varchar_length + 1] = '\0';
-            cur_offset += varchar_length;
             trafficCops.push_back(value);
+            cur_offset += varchar_length + VARCHAR_LENGTH_SIZE;
             break;
         }
     }
@@ -251,21 +254,17 @@ InteriorNode::InteriorNode(const void *page, Attribute &attribute) {
 RC InteriorNode::writeToPage(void *page, Attribute &attribute) {
     IndexManager *im = IndexManager::instance();
 
-    IndexDirectory directory;
-    directory.type = INTERIOR_NODE;
-    directory.numEntries = numEntries;
-    directory.freeSpaceOffset = freeSpaceOffset;
-
-    im->setIndexDirectory(page, directory);
+    im->setIndexDirectory(page, indexDirectory);
+    im->setFamilyDirectory(page, familyDirectory);
 
     // pointer to current point in page
-    uint8_t *cur_offset = (uint8_t*) page + sizeof(directory);
-    for (uint32_t i = 0; i < numEntries + 1; i++) {
+    uint8_t *cur_offset = (uint8_t*) page + sizeof(indexDirectory) + sizeof(familyDirectory);
+    for (uint32_t i = 0; i < indexDirectory.numEntries + 1; i++) {
         memcpy(cur_offset, &pagePointers[i], sizeof(uint32_t));
         cur_offset += sizeof(uint32_t);
     }
 
-    for (uint32_t i = 0; i < numEntries; i++) {
+    for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
         switch(attribute.type) {
         case TypeInt:
         case TypeReal:
@@ -273,12 +272,10 @@ RC InteriorNode::writeToPage(void *page, Attribute &attribute) {
             cur_offset += attribute.length;
             break;
         case TypeVarChar:
-            // NOTE this is memccpy, not memcpy
-            // copy from trafficCops entry until we hit the null plug
-            // memccpy returns a pointer to the last thing copied, so get length by subtracting the start from that
-            void *varchar_end = memccpy(cur_offset + VARCHAR_LENGTH_SIZE, trafficCops[i], '\0', attribute.length);
-            uint32_t varchar_length = (uint8_t*) varchar_end - cur_offset + VARCHAR_LENGTH_SIZE;
-            memcpy(cur_offset, &varchar_length, VARCHAR_LENGTH_SIZE);
+            uint32_t varchar_length;
+            memcpy(&varchar_length, trafficCops[i], VARCHAR_LENGTH_SIZE);
+            memcpy(cur_offset, trafficCops[i], varchar_length + VARCHAR_LENGTH_SIZE);
+            // add null plug to varchar to make it into a c string
             cur_offset += varchar_length + VARCHAR_LENGTH_SIZE;
             break;
         }
@@ -287,23 +284,19 @@ RC InteriorNode::writeToPage(void *page, Attribute &attribute) {
 }
 
 
-LeafNode::LeafNode(const void *page, Attribute &attribute){
+LeafNode::LeafNode(const void *page, const Attribute &attribute){
     IndexManager *im = IndexManager::instance();
 
-    IndexDirectory indexDirectory;
     im->getIndexDirectory(page, indexDirectory);
 
-    numEntries = indexDirectory.numEntries;
-    freeSpaceOffset = indexDirectory.freeSpaceOffset;
-
     // set the leafDirectory public variable
-    im->getLeafDirectory(page, siblings);
+    im->getFamilyDirectory(page, familyDirectory);
 
     // pointer to current point in page
-    uint8_t *cur_offset = (uint8_t*) page + sizeof(indexDirectory) + sizeof(siblings);
+    uint8_t *cur_offset = (uint8_t*) page + sizeof(indexDirectory) + sizeof(familyDirectory);
 
     // copy traffic cops out of page
-    for (uint32_t i = 0; i < numEntries; i++) {
+    for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
         // alloc an extra byte so that adding the null plug to a varchar won't overflow
         void *value = malloc(attribute.length + 1);
         switch (attribute.type) {
@@ -316,18 +309,15 @@ LeafNode::LeafNode(const void *page, Attribute &attribute){
         case TypeVarChar:
             uint32_t varchar_length;
             memcpy(&varchar_length, cur_offset, VARCHAR_LENGTH_SIZE);
-            // move past length so length isn't included when we copy
-            cur_offset += VARCHAR_LENGTH_SIZE;
-            memcpy(value, cur_offset, varchar_length);
+            memcpy(value, cur_offset, varchar_length + VARCHAR_LENGTH_SIZE);
             // add null plug to varchar to make it into a c string
-            ((char*) value)[varchar_length + 1] = '\0';
             keys.push_back(value);
-            cur_offset += varchar_length;
+            cur_offset += varchar_length + VARCHAR_LENGTH_SIZE;
             break;
         }
     }
 
-    for (uint32_t i = 0; i < numEntries; i++) {
+    for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
         rids.push_back( *((RID*) cur_offset) );
         cur_offset += sizeof(RID);
     }
@@ -337,18 +327,13 @@ LeafNode::LeafNode(const void *page, Attribute &attribute){
 RC LeafNode::writeToPage(void *page, Attribute &attribute){
     IndexManager *im = IndexManager::instance();
 
-    IndexDirectory indexDirectory;
-    indexDirectory.type = INTERIOR_NODE;
-    indexDirectory.numEntries = numEntries;
-    indexDirectory.freeSpaceOffset = freeSpaceOffset;
-
     im->setIndexDirectory(page, indexDirectory);
-    im->setLeafDirectory(page, siblings);
+    im->setFamilyDirectory(page, familyDirectory);
 
     // pointer to current point in page
-    uint8_t *cur_offset = (uint8_t*) page + sizeof(indexDirectory) + sizeof(siblings);
+    uint8_t *cur_offset = (uint8_t*) page + sizeof(indexDirectory) + sizeof(familyDirectory);
 
-    for (uint32_t i = 0; i < numEntries; i++) {
+    for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
         switch(attribute.type) {
         case TypeInt:
         case TypeReal:
@@ -356,18 +341,16 @@ RC LeafNode::writeToPage(void *page, Attribute &attribute){
             cur_offset += attribute.length;
             break;
         case TypeVarChar:
-            // NOTE this is memccpy, not memcpy
-            // copy from trafficCops entry until we hit the null plug
-            // memccpy returns a pointer to the last thing copied, so get length by subtracting the start from that
-            void *varchar_end = memccpy(cur_offset + VARCHAR_LENGTH_SIZE, keys[i], '\0', attribute.length);
-            uint32_t varchar_length = (uint8_t*) varchar_end - cur_offset + VARCHAR_LENGTH_SIZE;
-            memcpy(cur_offset, &varchar_length, VARCHAR_LENGTH_SIZE);
+            uint32_t varchar_length;
+            memcpy(&varchar_length, keys[i], VARCHAR_LENGTH_SIZE);
+            memcpy(cur_offset, keys[i], varchar_length + VARCHAR_LENGTH_SIZE);
+            // add null plug to varchar to make it into a c string
             cur_offset += varchar_length + VARCHAR_LENGTH_SIZE;
             break;
         }
     }
 
-    for (uint32_t i = 0; i < numEntries; i++) {
+    for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
         memcpy(cur_offset, &rids[i], sizeof(RID));
         cur_offset += sizeof(RID);
     }
