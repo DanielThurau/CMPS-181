@@ -23,11 +23,20 @@ typedef enum {
     LEAF_NODE
 } NodeType;
 
+
 typedef struct IndexDirectory {
     uint32_t numEntries;
     uint32_t freeSpaceOffset;
     NodeType type;
 } IndexDirectory;
+
+// Struct for leaf page sibling references
+// -1 indicated null reference if furthest 
+// left/right sibling
+typedef struct LeafDirectory {
+    int32_t leftSibling;
+    int32_t rightSibling;
+} LeafDirectory;
 
 class InteriorNode {
 public:
@@ -38,6 +47,19 @@ public:
     vector<uint32_t> pagePointers;
     uint32_t numEntries;
     uint32_t freeSpaceOffset;
+};
+
+class LeafNode {
+public:
+    LeafNode(const void *page, Attribute &attribute);
+    RC writeToPage(void *page, Attribute &attribute);
+
+    uint32_t numEntries;
+    uint32_t freeSpaceOffset;
+    LeafDirectory siblings;
+
+    vector<void*> keys;
+    vector<RID> rids;
 };
 
 class IX_ScanIterator;
@@ -79,6 +101,7 @@ class IndexManager {
         void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const;
 
         friend class InteriorNode;
+        friend class LeafNode;
 
     protected:
         IndexManager();
@@ -89,9 +112,13 @@ class IndexManager {
         static PagedFileManager *_pf_manager;
 
 
-        void newLeafBasedPage(void *page);
+        void newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling);
+        void newInteriorBasedPage(void *page);
+
         void getIndexDirectory(const void *page, IndexDirectory &directory);
         void setIndexDirectory(void *page, IndexDirectory &directory);
+        void getLeafDirectory(const void *page, LeafDirectory &directory);
+        void setLeafDirectory(void *page, LeafDirectory &directory);
 };
 
 
