@@ -18,16 +18,27 @@
 #define IX_READ_FAILED    5
 #define IX_WRITE_FAILED   6
 
-#define LEAF_PAGE         0
-#define BRANCH_PAGE       1 
+typedef enum {
+    INTERIOR_NODE = 0,
+    LEAF_NODE
+} NodeType;
 
-typedef struct IndexDirectory{
+typedef struct IndexDirectory {
     uint32_t numEntries;
     uint32_t freeSpaceOffset;
-    uint8_t statusIndicator;
+    NodeType type;
 } IndexDirectory;
 
+class InteriorNode {
+public:
+    InteriorNode(const void *page, Attribute &attribute);
+    RC writeToPage(void *page, Attribute &attribute);
 
+    vector<void *> trafficCops;
+    vector<uint32_t> pagePointers;
+    uint32_t numEntries;
+    uint32_t freeSpaceOffset;
+};
 
 class IX_ScanIterator;
 class IXFileHandle;
@@ -67,7 +78,7 @@ class IndexManager {
         // Print the B+ tree in pre-order (in a JSON record format)
         void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const;
 
-
+        friend class InteriorNode;
 
     protected:
         IndexManager();
@@ -79,6 +90,8 @@ class IndexManager {
 
 
         void newLeafBasedPage(void *page);
+        void getIndexDirectory(const void *page, IndexDirectory &directory);
+        void setIndexDirectory(void *page, IndexDirectory &directory);
 };
 
 

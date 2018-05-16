@@ -93,18 +93,17 @@ void IndexManager::newLeafBasedPage(void *page){
     IndexDirectory indexDirectory;
     indexDirectory.numEntries = 0;
     indexDirectory.freeSpaceOffset = sizeof(IndexDirectory);
-    indexDirectory.statusIndicator = LEAF_PAGE;
-    memcpy(page, &indexDirectory, sizeof(IndexDirectory));
+    indexDirectory.type = LEAF_NODE;
+    setIndexDirectory(page, indexDirectory);
 }
 
+void IndexManager::setIndexDirectory(void *page, IndexDirectory &directory) {
+    memcpy(page, &directory, sizeof(directory));
+}
 
-
-
-
-
-
-
-
+void IndexManager::getIndexDirectory(const void *page, IndexDirectory &directory) {
+    memcpy(&directory, page, sizeof(directory));
+}
 
 IX_ScanIterator::IX_ScanIterator()
 {
@@ -178,4 +177,83 @@ RC IXFileHandle::appendPage(const void *data){
 
 unsigned IXFileHandle::getNumberOfPages(){
     return fileHandle->getNumberOfPages();
+}
+
+InteriorNode::InteriorNode(const void *page, Attribute &attribute) {
+    IndexManager *im = IndexManager::instance();
+
+    IndexDirectory directory;
+    im->getIndexDirectory(page, directory);
+
+    numEntries = directory.numEntries;
+    freeSpaceOffset = directory.freeSpaceOffset;
+
+    // pointer to current point in page
+    uint8_t *cur_offset = (uint8_t*) page + sizeof(directory);
+    // copy page pointers out of page
+    for (int i = 0; i < numEntries + 1; i++) {
+        pagePointers.push_back( *((uint32_t*) cur_offset) );
+        cur_offset += sizeof(uint32_t);
+    }
+
+    // copy traffic cops out of page
+    for (int i = 0; i < numEntries; i++) {
+        // alloc an extra byte so that adding the null plug to a varchar won't overflow
+        void *value = malloc(attribute.length + 1);
+        switch (attribute.type) {
+        case TypeInt:
+        case TypeReal:
+            memcpy(value, cur_offset, attribute.length);
+            trafficCops.push_back(value);
+            cur_offset += attribute.length;
+            break;
+        case TypeVarChar:
+            uint32_t varchar_length;
+            memcpy(&varchar_length, cur_offset, VARCHAR_LENGTH_SIZE);
+            // move past length so length isn't included when we copy
+            cur_offset += VARCHAR_LENGTH_SIZE;
+            memcpy(value, cur_offset, varchar_length);
+            // add null plug to varchar to make it into a c string
+            ((char*) value)[varchar_length + 1] = '\0';
+            cur_offset += varchar_length;
+            break;
+        }
+    }
+}
+
+RC InteriorNode::writeToPage(void *page, Attribute &attribute) {
+    IndexManager *im = IndexManager::instance();
+
+    IndexDirectory directory;
+    directory.type = INTERIOR_NODE;
+    directory.numEntries = numEntries;
+    directory.freeSpaceOffset = freeSpaceOffset;
+
+    im->setIndexDirectory(page, directory);
+
+    // pointer to current point in page
+    uint8_t *cur_offset = (uint8_t*) page + sizeof(directory);
+    for (int i = 0; i < numEntries + 1; i++) {
+        memcpy(cur_offset, &pagePointers[i], sizeof(uint32_t));
+        cur_offset += sizeof(uint32_t);
+    }
+
+    for (int i = 0; i < numEntries; i++) {
+        switch(attribute.type) {
+        case TypeInt:
+        case TypeReal:
+            memcpy(cur_offset, trafficCops[i], attribute.length);
+            cur_offset += attribute.length;
+            break;
+        case TypeVarChar:
+            // NOTE this is memccpy, not memcpy
+            // copy from trafficCops entry until we hit the null plug
+            // memccpy returns a pointer to the last thing copied, so get length by subtracting the start from that
+            void *varchar_end = memccpy(cur_offset + VARCHAR_LENGTH_SIZE, trafficCops[i], '\0', attribute.length);
+            uint32_t varchar_length = (uint8_t*) varchar_end - cur_offset + VARCHAR_LENGTH_SIZE;
+            memcpy(cur_offset, &varchar_length, VARCHAR_LENGTH_SIZE);
+            cur_offset += varchar_length + VARCHAR_LENGTH_SIZE;
+            break;
+        }
+    }
 }
