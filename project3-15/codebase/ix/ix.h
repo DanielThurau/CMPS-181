@@ -42,26 +42,25 @@ typedef struct FamilyDirectory {
 class InteriorNode {
 public:
     InteriorNode(const void *page, const Attribute &attribute);
-    RC writeToPage(void *page, Attribute &attribute);
+    RC writeToPage(void *page, const Attribute &attribute);
 
     IndexDirectory  indexDirectory;
     FamilyDirectory familyDirectory;
 
     vector<void *> trafficCops;
     vector<PageNum> pagePointers;
-
 };
 
 class LeafNode {
 public:
     LeafNode(const void *page, const Attribute &attribute);
-    RC writeToPage(void *page, Attribute &attribute);
+    RC writeToPage(void *page, const Attribute &attribute);
 
     IndexDirectory  indexDirectory;
     FamilyDirectory familyDirectory;
 
     vector<void*> keys;
-    vector<RID> rids;
+    vector<const RID> rids;
 };
 
 class IX_ScanIterator;
@@ -120,12 +119,13 @@ class IndexManager {
         void getIndexDirectory(const void *page, IndexDirectory &directory);
         void setIndexDirectory(void *page, IndexDirectory &directory);
 
-        void getRootPage(IXFileHandle &ixfileHandle, void *page);
         NodeType getNodeType(const void *page);
         int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute);
-        void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page);
+        void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
         void getFamilyDirectory(const void *page, FamilyDirectory &directory);
         void setFamilyDirectory(void *page, FamilyDirectory &directory);
+        bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute);
+        RC addEntryToLeafNode(LeafNode &node, const void *key, RID rid, const Attribute &attribute);
 };
 
 

@@ -1,6 +1,8 @@
 
 #include "ix.h"
 
+#include <cmath>
+
 IndexManager* IndexManager::_index_manager = 0;
 PagedFileManager *IndexManager::_pf_manager = NULL;
 
@@ -65,7 +67,18 @@ RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
 
 RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
-    return -1;
+    void *page = malloc(PAGE_SIZE);
+    PageNum pageNum;
+    findPageWithKey(ixfileHandle, key, attribute, page, pageNum);
+    LeafNode *node = new LeafNode(page, attribute);
+    if (canEntryFitInLeafNode(*node, key, attribute)) {
+        addEntryToLeafNode(*node, key, rid, attribute);
+        node->writeToPage(page, attribute);
+        ixfileHandle.writePage(pageNum, page);
+    }
+
+    free(page);
+    return SUCCESS;
 }
 
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
@@ -131,11 +144,6 @@ void IndexManager::getIndexDirectory(const void *page, IndexDirectory &directory
     memcpy(&directory, page, sizeof(directory));
 }
 
-void IndexManager::getRootPage(IXFileHandle &ixfileHandle, void *page) {
-    // define page 0 to always be the root page
-    ixfileHandle.readPage(0, page);
-}
-
 NodeType IndexManager::getNodeType(const void *page) {
     IndexDirectory directory;
     getIndexDirectory(page, directory);
@@ -144,8 +152,15 @@ NodeType IndexManager::getNodeType(const void *page) {
 
 int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) {
     switch (attribute.type) {
-    case TypeInt: return *((unsigned *) key_1) - *((unsigned *) key_2);
-    case TypeReal: return *((float *) key_1) - *((float *) key_2);
+    case TypeInt:
+        return *((unsigned *) key_1) - *((unsigned *) key_2);
+    case TypeReal:
+        float fkey_1 = *((float*) key_1);
+        float fkey_2 = *((float*) key_2);
+        // do float comparisons explicitly to avoid rounding errors
+        if (fkey_1 == fkey_2) return 0;
+        if (fkey_1 < fkey_2) return -1;
+        if (fkey_1 > fkey_2) return 1;
     case TypeVarChar: 
         uint32_t len_1;
         uint32_t len_2;
@@ -161,25 +176,62 @@ int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, c
     }
 }
 
-void IndexManager::findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const Attribute &attribute, void *page) {
-    getRootPage(ixfileHandle, page);
+void IndexManager::findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const Attribute &attribute, void *page, PageNum &pageNum) {
+    pageNum = 0;
+    ixfileHandle.readPage(pageNum, page);
     while (getNodeType(page) != LEAF_NODE) {
         InteriorNode *node = new InteriorNode(page, attribute);
-        PageNum nextPage;
         int i = 0;
         for (; i < node->indexDirectory.numEntries; i++) {
             if (compareAttributeValues(key, node->trafficCops[i], attribute) < 0) {
-                nextPage = node->pagePointers[i];
+                pageNum = node->pagePointers[i];
                 break;
             }
         }
         if (i == node->indexDirectory.numEntries) {
-            nextPage = node->pagePointers[node->indexDirectory.numEntries];
+            pageNum = node->pagePointers[node->indexDirectory.numEntries];
         }
-        ixfileHandle.readPage(nextPage, page);
+        ixfileHandle.readPage(pageNum, page);
         delete node;
     }
+}
 
+bool IndexManager::canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute) {
+    uint32_t key_size;
+    switch(attribute.type) {
+    case TypeInt:
+    case TypeReal:
+        key_size = attribute.length;
+        break;
+    case TypeVarChar:
+        uint32_t varchar_length;
+        memcpy(&varchar_length, key, VARCHAR_LENGTH_SIZE);
+        key_size = varchar_length + VARCHAR_LENGTH_SIZE;
+        break;
+    }
+    return PAGE_SIZE - node.indexDirectory.freeSpaceOffset > key_size + sizeof(RID);
+}
+
+RC IndexManager::addEntryToLeafNode(LeafNode &node, const void *key, const RID rid, const Attribute &attribute) {
+    uint32_t key_size;
+    switch(attribute.type) {
+    case TypeInt:
+    case TypeReal:
+        key_size = attribute.length;
+        break;
+    case TypeVarChar:
+        uint32_t varchar_length;
+        memcpy(&varchar_length, key, VARCHAR_LENGTH_SIZE);
+        key_size = varchar_length + VARCHAR_LENGTH_SIZE;
+        break;
+    }
+    void *key_cpy = malloc(key_size);
+    memcpy(key_cpy, key, key_size);
+    node.keys.push_back(key_cpy);
+    node.rids.push_back(rid);
+    node.indexDirectory.freeSpaceOffset += key_size + sizeof(RID);
+    node.indexDirectory.numEntries++;
+    return SUCCESS;
 }
 
 void IndexManager::setFamilyDirectory(void *page, FamilyDirectory &directory) {
@@ -281,8 +333,7 @@ InteriorNode::InteriorNode(const void *page, const Attribute &attribute) {
 
     // copy traffic cops out of page
     for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
-        // alloc an extra byte so that adding the null plug to a varchar won't overflow
-        void *value = malloc(attribute.length + 1);
+        void *value = malloc(attribute.length);
         switch (attribute.type) {
         case TypeInt:
         case TypeReal:
@@ -301,7 +352,7 @@ InteriorNode::InteriorNode(const void *page, const Attribute &attribute) {
     }
 }
 
-RC InteriorNode::writeToPage(void *page, Attribute &attribute) {
+RC InteriorNode::writeToPage(void *page, const Attribute &attribute) {
     IndexManager *im = IndexManager::instance();
 
     im->setIndexDirectory(page, indexDirectory);
@@ -310,8 +361,8 @@ RC InteriorNode::writeToPage(void *page, Attribute &attribute) {
     // pointer to current point in page
     uint8_t *cur_offset = (uint8_t*) page + sizeof(indexDirectory) + sizeof(familyDirectory);
     for (uint32_t i = 0; i < indexDirectory.numEntries + 1; i++) {
-        memcpy(cur_offset, &pagePointers[i], sizeof(uint32_t));
-        cur_offset += sizeof(uint32_t);
+        memcpy(cur_offset, &pagePointers[i], sizeof(PageNum));
+        cur_offset += sizeof(PageNum);
     }
 
     for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
@@ -325,7 +376,6 @@ RC InteriorNode::writeToPage(void *page, Attribute &attribute) {
             uint32_t varchar_length;
             memcpy(&varchar_length, trafficCops[i], VARCHAR_LENGTH_SIZE);
             memcpy(cur_offset, trafficCops[i], varchar_length + VARCHAR_LENGTH_SIZE);
-            // add null plug to varchar to make it into a c string
             cur_offset += varchar_length + VARCHAR_LENGTH_SIZE;
             break;
         }
@@ -347,8 +397,7 @@ LeafNode::LeafNode(const void *page, const Attribute &attribute){
 
     // copy traffic cops out of page
     for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
-        // alloc an extra byte so that adding the null plug to a varchar won't overflow
-        void *value = malloc(attribute.length + 1);
+        void *value = malloc(attribute.length);
         switch (attribute.type) {
         case TypeInt:
         case TypeReal:
@@ -360,7 +409,6 @@ LeafNode::LeafNode(const void *page, const Attribute &attribute){
             uint32_t varchar_length;
             memcpy(&varchar_length, cur_offset, VARCHAR_LENGTH_SIZE);
             memcpy(value, cur_offset, varchar_length + VARCHAR_LENGTH_SIZE);
-            // add null plug to varchar to make it into a c string
             keys.push_back(value);
             cur_offset += varchar_length + VARCHAR_LENGTH_SIZE;
             break;
@@ -374,7 +422,7 @@ LeafNode::LeafNode(const void *page, const Attribute &attribute){
 
 }
 
-RC LeafNode::writeToPage(void *page, Attribute &attribute){
+RC LeafNode::writeToPage(void *page, const Attribute &attribute){
     IndexManager *im = IndexManager::instance();
 
     im->setIndexDirectory(page, indexDirectory);
