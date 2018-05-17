@@ -23,21 +23,45 @@ typedef enum {
     LEAF_NODE
 } NodeType;
 
+
 typedef struct IndexDirectory {
     uint32_t numEntries;
     uint32_t freeSpaceOffset;
     NodeType type;
 } IndexDirectory;
 
+// Struct for leaf page sibling references
+// -1 indicated null reference if furthest 
+// left/right sibling
+typedef struct FamilyDirectory {
+    PageNum parent;
+    int32_t leftSibling;
+    int32_t rightSibling;
+} FamilyDirectory;
+
 class InteriorNode {
 public:
     InteriorNode(const void *page, const Attribute &attribute);
     RC writeToPage(void *page, Attribute &attribute);
 
+    IndexDirectory  indexDirectory;
+    FamilyDirectory familyDirectory;
+
     vector<void *> trafficCops;
-    vector<uint32_t> pagePointers;
-    uint32_t numEntries;
-    uint32_t freeSpaceOffset;
+    vector<PageNum> pagePointers;
+
+};
+
+class LeafNode {
+public:
+    LeafNode(const void *page, const Attribute &attribute);
+    RC writeToPage(void *page, Attribute &attribute);
+
+    IndexDirectory  indexDirectory;
+    FamilyDirectory familyDirectory;
+
+    vector<void*> keys;
+    vector<RID> rids;
 };
 
 class IX_ScanIterator;
@@ -79,6 +103,7 @@ class IndexManager {
         void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const;
 
         friend class InteriorNode;
+        friend class LeafNode;
 
     protected:
         IndexManager();
@@ -89,7 +114,9 @@ class IndexManager {
         static PagedFileManager *_pf_manager;
 
 
-        void newLeafBasedPage(void *page);
+        void newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent);
+        void newInteriorBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent);
+
         void getIndexDirectory(const void *page, IndexDirectory &directory);
         void setIndexDirectory(void *page, IndexDirectory &directory);
 
@@ -97,6 +124,8 @@ class IndexManager {
         NodeType getNodeType(const void *page);
         int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute);
         void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page);
+        void getFamilyDirectory(const void *page, FamilyDirectory &directory);
+        void setFamilyDirectory(void *page, FamilyDirectory &directory);
 };
 
 
