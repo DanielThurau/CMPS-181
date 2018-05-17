@@ -105,6 +105,56 @@ void IndexManager::getIndexDirectory(const void *page, IndexDirectory &directory
     memcpy(&directory, page, sizeof(directory));
 }
 
+void IndexManager::getRootPage(IXFileHandle &ixfileHandle, void *page) {
+    // define page 0 to always be the root page
+    ixfileHandle.readPage(0, page);
+}
+
+NodeType IndexManager::getNodeType(const void *page) {
+    IndexDirectory directory;
+    getIndexDirectory(page, directory);
+    return directory.type;
+}
+
+int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) {
+    switch (attribute.type) {
+    case TypeInt: return *((unsigned *) key_1) - *((unsigned *) key_2);
+    case TypeReal: return *((float *) key_1) - *((float *) key_2);
+    case TypeVarChar: 
+        uint32_t len_1;
+        uint32_t len_2;
+        memcpy(&len_1, key_1, VARCHAR_LENGTH_SIZE);
+        memcpy(&len_2, key_2, VARCHAR_LENGTH_SIZE);
+        char key_1_str[len_1 + 1];
+        char key_2_str[len_2 + 1];
+        memcpy(key_1_str, (uint8_t *) key_1 + VARCHAR_LENGTH_SIZE, len_1);
+        memcpy(key_2_str, (uint8_t *) key_2 + VARCHAR_LENGTH_SIZE, len_2);
+        key_1_str[len_1] = '\0';
+        key_2_str[len_2] = '\0';
+        return strcmp(key_1_str, key_2_str);
+    }
+}
+
+void IndexManager::findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const Attribute &attribute, void *page) {
+    getRootPage(ixfileHandle, page);
+    while (getNodeType(page) != LEAF_NODE) {
+        InteriorNode *node = new InteriorNode(page, attribute);
+        PageNum nextPage;
+        int i = 0;
+        for (; i < node->numEntries; i++) {
+            if (compareAttributeValues(key, node->trafficCops[i], attribute) < 0) {
+                nextPage = node->pagePointers[i];
+                break;
+            }
+        }
+        if (i == node->numEntries) {
+            nextPage = node->pagePointers[node->numEntries];
+        }
+        ixfileHandle.readPage(nextPage, page);
+        delete node;
+    }
+}
+
 IX_ScanIterator::IX_ScanIterator()
 {
 }
@@ -179,7 +229,7 @@ unsigned IXFileHandle::getNumberOfPages(){
     return fileHandle->getNumberOfPages();
 }
 
-InteriorNode::InteriorNode(const void *page, Attribute &attribute) {
+InteriorNode::InteriorNode(const void *page, const Attribute &attribute) {
     IndexManager *im = IndexManager::instance();
 
     IndexDirectory directory;
@@ -250,7 +300,7 @@ RC InteriorNode::writeToPage(void *page, Attribute &attribute) {
             // copy from trafficCops entry until we hit the null plug
             // memccpy returns a pointer to the last thing copied, so get length by subtracting the start from that
             void *varchar_end = memccpy(cur_offset + VARCHAR_LENGTH_SIZE, trafficCops[i], '\0', attribute.length);
-            uint32_t varchar_length = (uint8_t*) varchar_end - cur_offset + VARCHAR_LENGTH_SIZE;
+            uint32_t varchar_length = (uint8_t*) varchar_end + VARCHAR_LENGTH_SIZE - cur_offset;
             memcpy(cur_offset, &varchar_length, VARCHAR_LENGTH_SIZE);
             cur_offset += varchar_length + VARCHAR_LENGTH_SIZE;
             break;

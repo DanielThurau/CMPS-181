@@ -31,7 +31,7 @@ typedef struct IndexDirectory {
 
 class InteriorNode {
 public:
-    InteriorNode(const void *page, Attribute &attribute);
+    InteriorNode(const void *page, const Attribute &attribute);
     RC writeToPage(void *page, Attribute &attribute);
 
     vector<void *> trafficCops;
@@ -92,6 +92,11 @@ class IndexManager {
         void newLeafBasedPage(void *page);
         void getIndexDirectory(const void *page, IndexDirectory &directory);
         void setIndexDirectory(void *page, IndexDirectory &directory);
+
+        void getRootPage(IXFileHandle &ixfileHandle, void *page);
+        NodeType getNodeType(const void *page);
+        int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute);
+        void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page);
 };
 
 
