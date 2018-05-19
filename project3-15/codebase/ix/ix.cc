@@ -157,9 +157,9 @@ void IndexManager::printLeafNode(IXFileHandle &ixfileHandle, const Attribute &at
         void *cur_key = node.keys[i];
         for (;;) {
             cout << "(" << node.rids[i].pageNum << "," << node.rids[i].slotNum << ")";
-            i++;
-            if (i < node.keys.size() && compareAttributeValues(cur_key, node.keys[i], attribute) == 0) {
+            if (i + 1 < node.keys.size() && compareAttributeValues(cur_key, node.keys[i + 1], attribute) == 0) {
                 cout << ",";
+                i++;
             }
             else break;
         }
