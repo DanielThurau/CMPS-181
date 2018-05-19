@@ -2,6 +2,8 @@
 #include "ix.h"
 
 #include <cmath>
+#include <iostream>
+#include <algorithm>
 
 IndexManager* IndexManager::_index_manager = 0;
 PagedFileManager *IndexManager::_pf_manager = NULL;
@@ -99,8 +101,96 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 }
 
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
+    cout << "{" << endl;
+    printTreeRecur(ixfileHandle, attribute, 0, 0);
+    cout << endl << "}" << endl;
 }
 
+
+void IndexManager::printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &attribute, PageNum pageNum, int depth) const {
+    void *page = malloc(PAGE_SIZE);
+    ixfileHandle.readPage(pageNum, page);
+    if (getNodeType(page) == LEAF_NODE) {
+        LeafNode *node = new LeafNode(page, attribute);
+        printLeafNode(ixfileHandle, attribute, *node, depth + 1);
+        delete node;
+    }
+    else {
+        InteriorNode *node = new InteriorNode(page, attribute);
+        printInteriorNode(ixfileHandle, attribute, *node, depth + 1);
+        delete node;
+    }
+}
+
+void IndexManager::printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth) const {
+    string spaces = string(depth * 4, ' ');
+    cout << "\"keys\":[";
+    for (size_t i = 0; i < node.trafficCops.size(); i++) {
+        cout << "\"";
+        printKey(node.trafficCops[i], attribute);
+        cout << "\"";
+        if (i < node.trafficCops.size() - 1) {
+            cout << ",";
+        }
+    }
+    cout << "]," << endl;
+    cout << spaces << "\"children\":[" << endl;
+    for (size_t i = 0; i < node.pagePointers.size(); i++) {
+        cout << string((depth + 1) * 4 - 1, ' ') << "{";
+        printTreeRecur(ixfileHandle, attribute, node.pagePointers[i], depth + 1);
+        if (i < node.pagePointers.size() - 1) {
+            cout << "}," << endl;
+        }
+        else {
+            cout << "}" << endl;
+        }
+    }
+    cout << spaces << "]";
+}
+
+void IndexManager::printLeafNode(IXFileHandle &ixfileHandle, const Attribute &attribute, LeafNode &node, int depth) const {
+    cout << "\"keys\": [";
+    for (size_t i = 0; i < node.keys.size(); i++) {
+        cout << "\"";
+        printKey(node.keys[i], attribute);
+        cout << ":[";
+        void *cur_key = node.keys[i];
+        for (;;) {
+            cout << "(" << node.rids[i].pageNum << "," << node.rids[i].slotNum << ")";
+            i++;
+            if (i < node.keys.size() && compareAttributeValues(cur_key, node.keys[i], attribute) == 0) {
+                cout << ",";
+            }
+            else break;
+        }
+        if (i < node.keys.size() - 1) {
+            cout << "]\",";
+        }
+        else {
+            cout << "]\"";
+        }
+    }
+    cout << "]";
+}
+
+void IndexManager::printKey(void *key, const Attribute &attribute) const {
+    switch(attribute.type) {
+    case TypeInt:
+        cout << *((unsigned *) key);
+        break;
+    case TypeReal:
+        cout << *((float *) key);
+        break;
+    case TypeVarChar: {
+        uint32_t varchar_size;
+        memcpy(&varchar_size, key, VARCHAR_LENGTH_SIZE);
+        char varchar_str[varchar_size + 1];
+        memcpy(varchar_str, (uint8_t *) key + VARCHAR_LENGTH_SIZE, varchar_size);
+        varchar_str[varchar_size] = '\0';
+        cout << varchar_str;
+    }
+    }
+}
 
 void IndexManager::newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent){
     memset(page, 0, PAGE_SIZE);
@@ -140,28 +230,29 @@ void IndexManager::setIndexDirectory(void *page, IndexDirectory &directory) {
     memcpy(page, &directory, sizeof(directory));
 }
 
-void IndexManager::getIndexDirectory(const void *page, IndexDirectory &directory) {
+void IndexManager::getIndexDirectory(const void *page, IndexDirectory &directory) const {
     memcpy(&directory, page, sizeof(directory));
 }
 
-NodeType IndexManager::getNodeType(const void *page) {
+NodeType IndexManager::getNodeType(const void *page) const {
     IndexDirectory directory;
     getIndexDirectory(page, directory);
     return directory.type;
 }
 
-int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) {
+int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) const {
     switch (attribute.type) {
     case TypeInt:
         return *((unsigned *) key_1) - *((unsigned *) key_2);
-    case TypeReal:
+    case TypeReal: {
         float fkey_1 = *((float*) key_1);
         float fkey_2 = *((float*) key_2);
         // do float comparisons explicitly to avoid rounding errors
         if (fkey_1 == fkey_2) return 0;
         if (fkey_1 < fkey_2) return -1;
         if (fkey_1 > fkey_2) return 1;
-    case TypeVarChar: 
+    }
+    case TypeVarChar:  {
         uint32_t len_1;
         uint32_t len_2;
         memcpy(&len_1, key_1, VARCHAR_LENGTH_SIZE);
@@ -174,6 +265,9 @@ int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, c
         key_2_str[len_2] = '\0';
         return strcmp(key_1_str, key_2_str);
     }
+    }
+    // should never reach here, but do this so compiler doesn't complain
+    return 0;
 }
 
 void IndexManager::findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const Attribute &attribute, void *page, PageNum &pageNum) {
@@ -181,7 +275,7 @@ void IndexManager::findPageWithKey(IXFileHandle &ixfileHandle, const void *key, 
     ixfileHandle.readPage(pageNum, page);
     while (getNodeType(page) != LEAF_NODE) {
         InteriorNode *node = new InteriorNode(page, attribute);
-        int i = 0;
+        uint32_t i = 0;
         for (; i < node->indexDirectory.numEntries; i++) {
             if (compareAttributeValues(key, node->trafficCops[i], attribute) < 0) {
                 pageNum = node->pagePointers[i];
@@ -227,8 +321,17 @@ RC IndexManager::addEntryToLeafNode(LeafNode &node, const void *key, const RID r
     }
     void *key_cpy = malloc(key_size);
     memcpy(key_cpy, key, key_size);
-    node.keys.push_back(key_cpy);
-    node.rids.push_back(rid);
+
+    // find index to do inserted index at
+    // a masterpiece
+    auto cmp_func = [&](const void *a, const void *b){ return compareAttributeValues(a, b, attribute) < 0; };
+    int insertion_index = distance(
+        node.keys.begin(),
+        upper_bound(node.keys.begin(), node.keys.end(), key, cmp_func)
+    );
+
+    node.keys.insert(node.keys.begin() + insertion_index, key_cpy);
+    node.rids.insert(node.rids.begin() + insertion_index, rid);
     node.indexDirectory.freeSpaceOffset += key_size + sizeof(RID);
     node.indexDirectory.numEntries++;
     return SUCCESS;

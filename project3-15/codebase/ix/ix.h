@@ -60,7 +60,7 @@ public:
     FamilyDirectory familyDirectory;
 
     vector<void*> keys;
-    vector<const RID> rids;
+    vector<RID> rids;
 };
 
 class IX_ScanIterator;
@@ -116,16 +116,21 @@ class IndexManager {
         void newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent);
         void newInteriorBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent);
 
-        void getIndexDirectory(const void *page, IndexDirectory &directory);
+        void getIndexDirectory(const void *page, IndexDirectory &directory) const;
         void setIndexDirectory(void *page, IndexDirectory &directory);
 
-        NodeType getNodeType(const void *page);
-        int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute);
+        NodeType getNodeType(const void *page) const;
+        int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) const;
         void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
         void getFamilyDirectory(const void *page, FamilyDirectory &directory);
         void setFamilyDirectory(void *page, FamilyDirectory &directory);
         bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute);
         RC addEntryToLeafNode(LeafNode &node, const void *key, RID rid, const Attribute &attribute);
+
+        void printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &attribute, PageNum pageNum, int depth) const;
+        void printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth) const;
+        void printLeafNode(IXFileHandle &ixfileHandle, const Attribute &attribute, LeafNode &node, int depth) const;
+        void printKey(void *key, const Attribute &attribute) const;
 };
 
 
