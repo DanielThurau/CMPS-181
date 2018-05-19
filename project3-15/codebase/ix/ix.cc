@@ -150,16 +150,16 @@ void IndexManager::printInteriorNode(IXFileHandle &ixfileHandle, const Attribute
 
 void IndexManager::printLeafNode(IXFileHandle &ixfileHandle, const Attribute &attribute, LeafNode &node, int depth) const {
     cout << "\"keys\": [";
-    for (size_t i = 0; i < node.keys.size(); i++) {
+    for (size_t i = 0; i < node.keys.size();) {
         cout << "\"";
         printKey(node.keys[i], attribute);
         cout << ":[";
         void *cur_key = node.keys[i];
         for (;;) {
             cout << "(" << node.rids[i].pageNum << "," << node.rids[i].slotNum << ")";
-            if (i + 1 < node.keys.size() && compareAttributeValues(cur_key, node.keys[i + 1], attribute) == 0) {
+            i++;
+            if (i < node.keys.size() && compareAttributeValues(cur_key, node.keys[i], attribute) == 0) {
                 cout << ",";
-                i++;
             }
             else break;
         }
