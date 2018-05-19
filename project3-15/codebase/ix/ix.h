@@ -18,16 +18,50 @@
 #define IX_READ_FAILED    5
 #define IX_WRITE_FAILED   6
 
-#define LEAF_PAGE         0
-#define BRANCH_PAGE       1 
+typedef enum {
+    INTERIOR_NODE = 0,
+    LEAF_NODE
+} NodeType;
 
-typedef struct IndexDirectory{
+
+typedef struct IndexDirectory {
     uint32_t numEntries;
     uint32_t freeSpaceOffset;
-    uint8_t statusIndicator;
+    NodeType type;
 } IndexDirectory;
 
+// Struct for leaf page sibling references
+// -1 indicated null reference if furthest 
+// left/right sibling
+typedef struct FamilyDirectory {
+    PageNum parent;
+    int32_t leftSibling;
+    int32_t rightSibling;
+} FamilyDirectory;
 
+class InteriorNode {
+public:
+    InteriorNode(const void *page, const Attribute &attribute);
+    RC writeToPage(void *page, const Attribute &attribute);
+
+    IndexDirectory  indexDirectory;
+    FamilyDirectory familyDirectory;
+
+    vector<void *> trafficCops;
+    vector<PageNum> pagePointers;
+};
+
+class LeafNode {
+public:
+    LeafNode(const void *page, const Attribute &attribute);
+    RC writeToPage(void *page, const Attribute &attribute);
+
+    IndexDirectory  indexDirectory;
+    FamilyDirectory familyDirectory;
+
+    vector<void*> keys;
+    vector<RID> rids;
+};
 
 class IX_ScanIterator;
 class IXFileHandle;
@@ -67,7 +101,8 @@ class IndexManager {
         // Print the B+ tree in pre-order (in a JSON record format)
         void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const;
 
-
+        friend class InteriorNode;
+        friend class LeafNode;
 
     protected:
         IndexManager();
@@ -78,7 +113,24 @@ class IndexManager {
         static PagedFileManager *_pf_manager;
 
 
-        void newLeafBasedPage(void *page);
+        void newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent);
+        void newInteriorBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent);
+
+        void getIndexDirectory(const void *page, IndexDirectory &directory) const;
+        void setIndexDirectory(void *page, IndexDirectory &directory);
+
+        NodeType getNodeType(const void *page) const;
+        int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) const;
+        void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
+        void getFamilyDirectory(const void *page, FamilyDirectory &directory);
+        void setFamilyDirectory(void *page, FamilyDirectory &directory);
+        bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute);
+        RC addEntryToLeafNode(LeafNode &node, const void *key, RID rid, const Attribute &attribute);
+
+        void printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &attribute, PageNum pageNum, int depth) const;
+        void printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth) const;
+        void printLeafNode(IXFileHandle &ixfileHandle, const Attribute &attribute, LeafNode &node, int depth) const;
+        void printKey(void *key, const Attribute &attribute) const;
 };
 
 // Non-leaf nodes in the B+ tree.
