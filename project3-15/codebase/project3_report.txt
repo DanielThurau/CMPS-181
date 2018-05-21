@@ -24,63 +24,129 @@ implemented in the ix.cc file.
 - Other implementation details:
 IndexManager: -------------------------------------------------------------------------------------------------------
 
-	createFile(const string &fileName):
+	RC createFile(const string &fileName):
 		Utilizes PagedFileManager::createFile() to create a file with name fileName for the index. Creates the
 		root for the index using the newLeafBasedPage() method.
 
-	destroyFile(const string &fileName):
+	RC destroyFile(const string &fileName):
 		Utilizes PagedFileManager::destroyFile() to destroy the file whose name matches fileName.
 
-	openFile(const string &fileName, IXFileHandle &ixfileHandle):
+	RC openFile(const string &fileName, IXFileHandle &ixfileHandle):
 		Utilizes PagedFileManager::openFile() to open the file with the provided parameters.
 
-	closeFile(IXFileHandle &ixfileHandle):
+	RC closeFile(IXFileHandle &ixfileHandle):
 		Utilizes PagedFileManager::closeFile() to close the file with the provided parameters.
 
-	insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
+	RC insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
 		Uses the findPageWithKey() method to find the pageNum of the leafNode where the entry belongs if it
 		is successfully inserted. We then use canEntryFitInLeafNode() to verify if the leafNode has the room
 		to house the new entry.
 		----------OVERFLOW STILL IN PROGRESS.----------
 
-	deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
+	RC deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
 		Blah.
 
-	scan(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *lowKey, const void *highKey,
+	RC scan(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *lowKey, const void *highKey,
           bool lowKeyInclusive, bool highKeyInclusive, IX_ScanIterator &ix_ScanIterator):
 		Blah.
 
-	printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute):
+	void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute):
 		Invokes printTreeRecur() with a depth and pageNum of 0 to begin printing from the root with surrounding
 		brackets. More relevant detail in the description for printTreeRecur().
 
-	printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &attribute, PageNum pageNum, int depth):
+	void printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &attribute, PageNum pageNum, int depth):
 		Uses getNodeType() to differentiate the node contained in the pageNum passed in. If it is a leafNode,
 		a node is created from the information on the page and is then used to invoke printLeafNode() with an
 		incremented level of depth. Similarly if the provided pageNum corresponds to an interiorNode, a node
 		is created from the information on the page and is used to invoke printInteriorNode() with an
 		incremented level of depth.
 
-	printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth):
+	void printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth):
 		Prints the vecotr of trafficCops contained in the interiorNode and subsequently invokes printTreeRecur()
 		again for each of the members of the node's pagePointer vector.
 
-	printLeafNode(IXFileHandle &ixfileHandle, const Attribute &attribute, LeafNode &node, int depth):
+	void printLeafNode(IXFileHandle &ixfileHandle, const Attribute &attribute, LeafNode &node, int depth):
+		Prints the keys for all members of the node's keys vector using printKey(). Following this, each rid in
+		the rid vector of the node is used to print the corresponding pageNum and slotNum.
+
+	void printKey(void *key, const Attribute &attribute):
+		Prints the key passed in through a switch statement based on its attribute's type: TypeInt, TypeReal,
+		or TypeVarChar.
+
+	void newLeafBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent):
+		Sets up a new leaf-based page using the page parameter. An IndexDirectory is created to have 
+		numEntries = 0, a freeSpaceOffset set to the space immediately following an indexDirectory and 
+		FamilyDirectory, and the IndexDirectory type is set to LEAF_NODE. A FamilyDirectory is created for the
+		new page, using the leftSibling, rightSibling, and parent parameters for the properties which share their
+		corresponding names. setIndexDirectory() and setFamilyDirectory() are then used to set the new respective
+		directories for the new leaf page.
+
+	void newInteriorBasedPage(void *page, int32_t leftSibling, int32_t rightSibling, PageNum parent):
+		Sets up a new leaf-based page using the page parameter. An IndexDirectory is created to have 
+		numEntries = 0, a freeSpaceOffset set to the space immediately following an indexDirectory and the
+		IndexDirectory type is set to INTERIOR_NODE. A FamilyDirectory is created for the new page, using the
+		leftSibling, rightSibling, and parent parameters for the properties which share their corresponding names.
+		setIndexDirectory() and setFamilyDirectory() are then used to set the new respective directories for the
+		new interior page.
+
+	void setIndexDirectory(void *page, IndexDirectory &directory):
+		Uses memset() to copy the contents of directory into the supplied page.
+
+	void getIndexDirectory(const void *page, IndexDirectory &directory):
+		Uses memset() to copy the contents of page into the supplied directory.
+
+	NodeType getNodeType(const void *page):
+		Uses getIndexDirectory() to obtain the directory of page. Once obtained, they type for the directory is
+		returned.
+
+	int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute):
+		Performs a comparison with a switch statement based on the type of the attribute. Returns negative if key_1
+		comes before key_2, 0 if key_1 equals key_2, and positive if key_1 comes after key_2.
+
+	void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const Attribute &attribute, void *page,
+	  PageNum &pageNum):
+		Uses readPage() on ixfileHandle to read the contents at pageNum into page. Using getNodeType() to indicate
+		whether or not the page is found, the interiorNodes are traversed accordingly using compareAttributeValues()
+		to indicate the direction of the next traversal. At the end of every traversal, the resultant node is read
+		into page, eventually leading to the leafNode containing key.
+
+	bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute):
+		The key is run through a switch statement to determine a value key_size based on the attribute's type. A truth
+		value is returned on whether or not there is sufficient space in the node based on its freeSpaceOffset,
+		key_size, and the size of an RID.
+
+	void addEntryToLeafNode(LeafNode &node, const void *key, const RID rid, const Attribute &attribute):
+		--------OVERFLOW STILL IN PROGRESS. HOLD OFF. --------------------------------
+
+	void setFamilyDirectory(void *page, FamilyDirectory &directory):
+		Uses memset() to copy the contents of directory into the supplied page.
+
+	void getFamilyDirectory(const void *page, FamilyDirectory &directory):
+		Uses memset() to copy the contents of page into the supplied directory.
+
+IXFileHandle: -------------------------------------------------------------------------------------------------------
+
+	RC getNextEntry(RID &rid, void *key):
 		Blah.
-		
-		
 
-LeafNode: -----------------------------------------------------------------------------------------------------------
+	RC close():
+		Blah.
 
-	indexDirectory:
+	RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount):
+		Sets readPageCount to the ixReadPageCounter of the IXFileHandle, writePageCount to the ixWritePageCounter,
+		and appendPageCount to the ixAppendPageCounter.
 
-	familyDirectory:
+	RC readPage(PageNum pageNum, void *data):
+		Uses readPage() for the fileHandle to read the contents of the page at pageNum into data.
 
-	keys:
+	RC writePage(PageNum pageNum, const void *data):
+		Uses writePage() for the fileHandle to write data into the page at pageNum.
 
-	rids:
+	RC appendPage(const void *data):
+		Uses appendPage() for the fileHandle to append data.
 
-	writeToPage():
+	unsigned getNumberOfPages():
+		Returns the result of getNumberOfPages() for the fileHandle.
 
 InteriorNode: -------------------------------------------------------------------------------------------------------
 
@@ -91,6 +157,18 @@ InteriorNode: ------------------------------------------------------------------
 	trafficCops:
 
 	pagePointers:
+
+	writeToPage():
+
+LeafNode: -----------------------------------------------------------------------------------------------------------
+
+	indexDirectory:
+
+	familyDirectory:
+
+	keys:
+
+	rids:
 
 	writeToPage():
 
