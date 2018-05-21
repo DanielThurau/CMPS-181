@@ -139,6 +139,15 @@ void IndexManager::getFamilyDirectory(const void *page, FamilyDirectory &directo
     memcpy(&directory, (uint8_t*) page + sizeof(IndexDirectory), sizeof(directory));
 }
 
+RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *trafficCop, void *page){
+    // first time we call this function
+    if(trafficCop == nullptr){
+        LeafNode leafNode = LeafNode(page, attribute);
+        
+    }
+}
+
+
 IX_ScanIterator::IX_ScanIterator()
 {
 }

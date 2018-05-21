@@ -87,6 +87,8 @@ class IndexManager {
         // Insert an entry into the given index that is indicated by the given ixfileHandle.
         RC insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid);
 
+        RC insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *trafficCop, void *page);
+
         // Delete an entry from the given index that is indicated by the given ixfileHandle.
         RC deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid);
 
