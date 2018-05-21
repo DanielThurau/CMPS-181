@@ -12,15 +12,87 @@ Team number (e.g., 01) :
 3. Page Format
 - Show your internal-page (non-leaf node) design.
 
+
 - Show your leaf-page (leaf node) design.
 
 
 4. Implementation Detail
 - Have you added your own source file (.cc or .h)?
-
+No additional source file was added. Classes for the interior and leaf nodes are created in the ix.h file and have their respective functions
+implemented in the ix.cc file.
 
 - Other implementation details:
+IndexManager: -------------------------------------------------------------------------------------------------------
 
+	createFile(const string &fileName):
+		Utilizes PagedFileManager::createFile() to create a file with name fileName for the index. Creates the
+		root for the index using the newLeafBasedPage() method.
+
+	destroyFile(const string &fileName):
+		Utilizes PagedFileManager::destroyFile() to destroy the file whose name matches fileName.
+
+	openFile(const string &fileName, IXFileHandle &ixfileHandle):
+		Utilizes PagedFileManager::openFile() to open the file with the provided parameters.
+
+	closeFile(IXFileHandle &ixfileHandle):
+		Utilizes PagedFileManager::closeFile() to close the file with the provided parameters.
+
+	insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
+		Uses the findPageWithKey() method to find the pageNum of the leafNode where the entry belongs if it
+		is successfully inserted. We then use canEntryFitInLeafNode() to verify if the leafNode has the room
+		to house the new entry.
+		----------OVERFLOW STILL IN PROGRESS.----------
+
+	deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
+		Blah.
+
+	scan(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *lowKey, const void *highKey,
+          bool lowKeyInclusive, bool highKeyInclusive, IX_ScanIterator &ix_ScanIterator):
+		Blah.
+
+	printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute):
+		Invokes printTreeRecur() with a depth and pageNum of 0 to begin printing from the root with surrounding
+		brackets. More relevant detail in the description for printTreeRecur().
+
+	printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &attribute, PageNum pageNum, int depth):
+		Uses getNodeType() to differentiate the node contained in the pageNum passed in. If it is a leafNode,
+		a node is created from the information on the page and is then used to invoke printLeafNode() with an
+		incremented level of depth. Similarly if the provided pageNum corresponds to an interiorNode, a node
+		is created from the information on the page and is used to invoke printInteriorNode() with an
+		incremented level of depth.
+
+	printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth):
+		Prints the vecotr of trafficCops contained in the interiorNode and subsequently invokes printTreeRecur()
+		again for each of the members of the node's pagePointer vector.
+
+	printLeafNode(IXFileHandle &ixfileHandle, const Attribute &attribute, LeafNode &node, int depth):
+		Blah.
+		
+		
+
+LeafNode: -----------------------------------------------------------------------------------------------------------
+
+	indexDirectory:
+
+	familyDirectory:
+
+	keys:
+
+	rids:
+
+	writeToPage():
+
+InteriorNode: -------------------------------------------------------------------------------------------------------
+
+	indexDirectory:
+
+	familyDirectory:
+
+	trafficCops:
+
+	pagePointers:
+
+	writeToPage():
 
 5. Other (optional)
 - Freely use this section to tell us about things that are related to the project 3, but not related to the other sections (optional).  For example, if you chose to do the extra credit (non-lazy deletion), please tell us here what you did.
