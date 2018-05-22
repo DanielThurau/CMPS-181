@@ -17,6 +17,7 @@
 #define IX_APPEND_FAILED  4
 #define IX_READ_FAILED    5
 #define IX_WRITE_FAILED   6
+#define IX_KEY_NOT_FOUND  7
 
 typedef enum {
     INTERIOR_NODE = 0,
