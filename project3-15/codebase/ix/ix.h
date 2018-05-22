@@ -134,7 +134,9 @@ class IndexManager {
         void getFamilyDirectory(const void *page, FamilyDirectory &directory);
         void setFamilyDirectory(void *page, FamilyDirectory &directory);
         bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute);
+        bool canEntryFitInInteriorNode(InteriorNode node, const void *key, const Attribute &attribute);
         RC addEntryToLeafNode(LeafNode &node, const void *key, RID rid, const Attribute &attribute);
+        RC addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &node, const void *key, const Attribute &attribute);
 
         void printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &attribute, PageNum pageNum, int depth) const;
         void printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth) const;
@@ -144,8 +146,10 @@ class IndexManager {
         RC insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid, void *page, PageNum &pageNum);
         RC insertIntoInterior(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid, void *page);
         RC insertIntoLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, void *page);
-        void * splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, const Attribute &attribute);
+        void *splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, const Attribute &attribute);
+        void *splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &originNode, InteriorNode &newNode, const Attribute &attribute);
         uint32_t calculateFreeSpaceOffset(LeafNode &node, const Attribute &attribute);
+        uint32_t calculateFreeSpaceOffset(InteriorNode &node, const Attribute &attribute);
 };
 
 

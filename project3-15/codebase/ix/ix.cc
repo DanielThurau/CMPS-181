@@ -74,6 +74,8 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
         addEntryToLeafNode(*node, key, rid, attribute);
         node->writeToPage(page, attribute);
         ixfileHandle.writePage(pageNum, page);
+    }else{
+
     }
     // else split and insert into page
 
@@ -304,6 +306,22 @@ bool IndexManager::canEntryFitInLeafNode(LeafNode node, const void *key, const A
     return PAGE_SIZE - node.indexDirectory.freeSpaceOffset > key_size + sizeof(RID);
 }
 
+bool IndexManager::canEntryFitInInteriorNode(InteriorNode node, const void *key, const Attribute &attribute) {
+    uint32_t key_size;
+    switch(attribute.type) {
+    case TypeInt:
+    case TypeReal:
+        key_size = attribute.length;
+        break;
+    case TypeVarChar:
+        uint32_t varchar_length;
+        memcpy(&varchar_length, key, VARCHAR_LENGTH_SIZE);
+        key_size = varchar_length + VARCHAR_LENGTH_SIZE;
+        break;
+    }
+    return PAGE_SIZE - node.indexDirectory.freeSpaceOffset > key_size + sizeof(PageNum);
+}
+
 RC IndexManager::addEntryToLeafNode(LeafNode &node, const void *key, const RID rid, const Attribute &attribute) {
     uint32_t key_size;
     switch(attribute.type) {
@@ -335,6 +353,38 @@ RC IndexManager::addEntryToLeafNode(LeafNode &node, const void *key, const RID r
     return SUCCESS;
 }
 
+RC IndexManager::addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &node, const void *key, const Attribute &attribute) {
+    uint32_t key_size;
+    switch(attribute.type) {
+    case TypeInt:
+    case TypeReal:
+        key_size = attribute.length;
+        break;
+    case TypeVarChar:
+        uint32_t varchar_length;
+        memcpy(&varchar_length, key, VARCHAR_LENGTH_SIZE);
+        key_size = varchar_length + VARCHAR_LENGTH_SIZE;
+        break;
+    }
+    void *key_cpy = malloc(key_size);
+    memcpy(key_cpy, key, key_size);
+
+    // find index to do inserted index at
+    // a masterpiece
+    auto cmp_func = [&](const void *a, const void *b){ return compareAttributeValues(a, b, attribute) < 0; };
+    int insertion_index = distance(
+        node.trafficCops.begin(),
+        upper_bound(node.trafficCops.begin(), node.trafficCops.end(), key, cmp_func)
+    );
+
+    node.trafficCops.insert(node.trafficCops.begin() + insertion_index, key_cpy);
+    node.pagePointers.insert(node.pagePointers.begin() + insertion_index, ixfileHandle.getNumberOfPages() - 1);
+    node.indexDirectory.freeSpaceOffset += key_size + sizeof(PageNum);
+    node.indexDirectory.numEntries++;
+    return SUCCESS;
+}
+
+
 void IndexManager::setFamilyDirectory(void *page, FamilyDirectory &directory) {
     memcpy((uint8_t*) page + sizeof(IndexDirectory), &directory, sizeof(directory));
 }
@@ -349,26 +399,52 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
         // load page data into leafNode object
         LeafNode *node = new LeafNode(page, attribute, pageNum);
 
-        // add to vector even if it over fills the FSO
-        if((rc = addEntryToLeafNode(*node, key, rid, attribute)) != SUCCESS){
-            return -1;
+        if(pageNum != 0){
+            // add to vector even if it over fills the FSO
+            if((rc = addEntryToLeafNode(*node, key, rid, attribute)) != SUCCESS){
+                return -1;
+            }
+
+            // reference to empty leafNode object that will be split into
+            LeafNode *newLeaf = new LeafNode();
+            
+            // newKey is value to be inserted into parent node
+            void *newKey = splitLeafNode(ixfileHandle, *node, *newLeaf, attribute);
+
+            // read in parent page 
+            void *parentPage = malloc(PAGE_SIZE); 
+            ixfileHandle.readPage(node->familyDirectory.parent, parentPage);
+
+            // recursive call to insert into parent
+            return insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent);
+        }else{
+            
         }
-
-        // reference to empty leafNode object that will be split into
-        LeafNode *newLeaf = new LeafNode();
         
-        // newKey is value to be inserted into parent node
-        void *newKey = splitLeafNode(ixfileHandle, *node, *newLeaf, attribute);
-
-        // read in parent page 
-        void *parentPage = malloc(PAGE_SIZE); 
-        ixfileHandle.readPage(node->familyDirectory.parent, parentPage);
-
-        // recursive call to insert into parent
-        return insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent);
 
     }else{
-        // insert into interior node
+        InteriorNode *node = new InteriorNode(page, attribute, pageNum);
+
+        if (canEntryFitInInteriorNode(*node, key, attribute)) {
+            addEntryToInteriorNode(ixfileHandle, *node, key, attribute);
+            return SUCCESS;
+        }else{
+            if(pageNum != 0){
+                addEntryToInteriorNode(ixfileHandle, *node, key, attribute);
+
+                InteriorNode *newNode = new InteriorNode();
+
+                void *newKey = splitInteriorNode(ixfileHandle, *node, *newNode, attribute);
+
+                void *parentPage = malloc(PAGE_SIZE);
+                ixfileHandle.readPage(node->familyDirectory.parent, parentPage);
+
+                return insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent);
+
+            }
+        }
+
+
     }
     return -1;
 }
@@ -416,15 +492,69 @@ void *IndexManager::splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLe
 
     // write nodes to new page and add to FS
     newLeaf.writeToPage(page, attribute);
-    ixfileHandle.writePage(newLeaf.selfPageNum, page);
+    ixfileHandle.appendPage(page);
 
     // traffic cop is first key of new node (right sibling of origin)
     void* trafficCop = malloc(attribute.length);
     memcpy(trafficCop, newLeaf.keys[0], attribute.length);
 
     return trafficCop;
+}
+
+void *IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &originNode, InteriorNode &newNode, const Attribute &attribute){
+
+    //set obvious directory values
+    newNode.indexDirectory.type = INTERIOR_NODE;
+
+    newNode.familyDirectory.leftSibling = originNode.selfPageNum;
+    newNode.familyDirectory.rightSibling = originNode.familyDirectory.rightSibling;
+    newNode.familyDirectory.parent = originNode.familyDirectory.parent;
+
+    // pageNum is new page (need of non heap free page buffer manager)
+    newNode.selfPageNum = ixfileHandle.getNumberOfPages();
+
+    // take the subvector of the original node's keys and copy it to the new node
+    vector<void*>::const_iterator firstKey = originNode.trafficCops.begin() + ceil(originNode.trafficCops.size() / 2) + 1;
+    vector<void*>::const_iterator lastKey = originNode.trafficCops.begin() + originNode.trafficCops.size();
+    newNode.trafficCops = vector<void*>(firstKey, lastKey);
+
+    // erase split values out of original node
+    originNode.trafficCops.erase(originNode.trafficCops.begin() + ceil(originNode.trafficCops.size()/2) + 1, originNode.trafficCops.begin() + originNode.trafficCops.size());
+
+    // take the subvector of the original node's rids and copy it to the new node
+    vector<PageNum>::const_iterator firstRID = originNode.pagePointers.begin() + ceil(originNode.pagePointers.size() / 2) + 1;
+    vector<PageNum>::const_iterator lastRID = originNode.pagePointers.begin() + originNode.pagePointers.size();
+    newNode.pagePointers = vector<PageNum>(firstRID, lastRID);
+
+    // erase split values out of original node
+    originNode.pagePointers.erase(originNode.pagePointers.begin() + ceil(originNode.pagePointers.size()/2) + 1, originNode.pagePointers.begin() + originNode.pagePointers.size());
+
+    originNode.indexDirectory.numEntries = originNode.trafficCops.size();
+    newNode.indexDirectory.numEntries = originNode.trafficCops.size();
+
+    // recalculate Free space offset (difficult if varchar)
+    originNode.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(originNode, attribute);
+    newNode.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(newNode, attribute);
+
+    // traffic cop is first key of new node (right sibling of origin)
+    void* trafficCop = malloc(attribute.length);
+    memcpy(trafficCop, newNode.trafficCops[0], attribute.length);
+
+    newNode.trafficCops.erase(newNode.trafficCops.begin());
+    newNode.pagePointers.erase(newNode.pagePointers.begin());
+
+    void *page = malloc(PAGE_SIZE);
+
+    // write nodes to new page and add to FS
+    originNode.writeToPage(page, attribute);
+    ixfileHandle.writePage(originNode.selfPageNum, page);
+
+    // write nodes to new page and add to FS
+    newNode.writeToPage(page, attribute);
+    ixfileHandle.appendPage(page);
 
 
+    return trafficCop;
 }
 
 uint32_t IndexManager::calculateFreeSpaceOffset(LeafNode &node, const Attribute &attribute){
@@ -448,6 +578,31 @@ uint32_t IndexManager::calculateFreeSpaceOffset(LeafNode &node, const Attribute 
         }
 
     FSO += sizeof(RID) * node.rids.size();
+
+    return FSO;
+}
+
+uint32_t IndexManager::calculateFreeSpaceOffset(InteriorNode &node, const Attribute &attribute){
+    uint32_t FSO = 0;
+
+    FSO += sizeof(FamilyDirectory);
+    FSO += sizeof(IndexDirectory);
+
+    switch (attribute.type) {
+        case TypeInt:
+        case TypeReal:
+            FSO += 4 * node.trafficCops.size(); 
+            break;
+        case TypeVarChar:
+            for(unsigned i = 0; i < node.trafficCops.size(); i++){
+                uint32_t varchar_length;
+                memcpy(&varchar_length, node.trafficCops[i], VARCHAR_LENGTH_SIZE);
+                FSO += varchar_length + VARCHAR_LENGTH_SIZE;
+            }
+            break;
+        }
+
+    FSO += sizeof(PageNum) * node.pagePointers.size();
 
     return FSO;
 }
