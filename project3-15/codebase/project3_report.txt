@@ -40,11 +40,15 @@ IndexManager: ------------------------------------------------------------------
 	RC insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
 		Uses the findPageWithKey() method to find the pageNum of the leafNode where the entry belongs if it
 		is successfully inserted. We then use canEntryFitInLeafNode() to verify if the leafNode has the room
-		to house the new entry.
-		----------OVERFLOW STILL IN PROGRESS.----------
+		to house the new entry. If it does, then we use addEntryToLeafNode() to add the entry to the LeafNode.
+		If it does not, then we must split the tree to make room, so we call insertAndSplit(). At the end,
+		page is freed and SUCCESS is returned.
 
 	RC deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
-		Blah.
+		We use findPageWithKey() to find the page which contains the LeafNode holding key, for which we create
+		a corresponding LeafNode node. From here, we iterate through the keys vector of node and using
+		compareAttributeValues(), we find the member which exactly matches key. When we find it, the key and
+		corresponding rid are removed from the vector and the resultant page is written back with writeToPage().
 
 	RC scan(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *lowKey, const void *highKey,
           bool lowKeyInclusive, bool highKeyInclusive, IX_ScanIterator &ix_ScanIterator):
