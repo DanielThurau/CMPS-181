@@ -4,6 +4,9 @@
 #include <vector>
 #include <string>
 #include <cstring>
+#include <cmath>
+#include <iostream>
+#include <algorithm>
 
 #include "../rbf/rbfm.h"
 
@@ -42,9 +45,11 @@ typedef struct FamilyDirectory {
 
 class InteriorNode {
 public:
-    InteriorNode(const void *page, const Attribute &attribute);
+    InteriorNode();
+    InteriorNode(const void *page, const Attribute &attribute, PageNum pageNum);
     RC writeToPage(void *page, const Attribute &attribute);
 
+    PageNum selfPageNum;
     IndexDirectory  indexDirectory;
     FamilyDirectory familyDirectory;
 
@@ -54,9 +59,13 @@ public:
 
 class LeafNode {
 public:
-    LeafNode(const void *page, const Attribute &attribute);
+    // page not created
+    LeafNode();
+    // load page data into class
+    LeafNode(const void *page, const Attribute &attribute, PageNum pageNum);
     RC writeToPage(void *page, const Attribute &attribute);
 
+    PageNum selfPageNum;
     IndexDirectory  indexDirectory;
     FamilyDirectory familyDirectory;
 
@@ -132,6 +141,12 @@ class IndexManager {
         void printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth) const;
         void printLeafNode(IXFileHandle &ixfileHandle, const Attribute &attribute, LeafNode &node, int depth) const;
         void printKey(void *key, const Attribute &attribute) const;
+
+        RC insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid, void *page, PageNum &pageNum);
+        RC insertIntoInterior(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid, void *page);
+        RC insertIntoLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, void *page);
+        void * splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, const Attribute &attribute);
+        uint32_t calculateFreeSpaceOffset(LeafNode &node, const Attribute &attribute);
 };
 
 
