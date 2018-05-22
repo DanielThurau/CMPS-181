@@ -26,6 +26,11 @@ int testCase_2(const string &indexFileName, const Attribute &attribute)
     rid.pageNum = key;
     rid.slotNum = key+1;
 
+    RID rid2;
+    int key2 = 20;
+    rid2.pageNum = key2;
+    rid2.slotNum = key2 + 1;
+
     unsigned readPageCount = 0;
     unsigned writePageCount = 0;
     unsigned appendPageCount = 0;
@@ -52,6 +57,8 @@ int testCase_2(const string &indexFileName, const Attribute &attribute)
     // insert entry
     rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
     assert(rc == success && "indexManager::insertEntry() should not fail.");
+
+    indexManager->insertEntry(ixfileHandle, attribute, &key2, rid2);
 
     // collect counters
     rc = ixfileHandle.collectCounterValues(readPageCountAfter, writePageCountAfter, appendPageCountAfter);
