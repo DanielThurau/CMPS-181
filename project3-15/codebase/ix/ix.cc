@@ -418,7 +418,15 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
             // recursive call to insert into parent
             return insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent);
         }else{
+            if((rc = addEntryToLeafNode(*node, key, rid, attribute)) != SUCCESS){
+                return -1;
+            }
+
+            // reference to empty leafNode object that will be split into
+            LeafNode *newLeaf = new LeafNode();
             
+            // newKey is value to be inserted into parent node
+            void *newKey = splitRootLeafNode(ixfileHandle, *node, *newLeaf, attribute);
         }
         
 
@@ -447,6 +455,57 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
 
     }
     return -1;
+}
+
+void *IndexManager::splitRootLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, const Attribute &attribute){
+    //set obvious directory values
+    newLeaf.indexDirectory.type = LEAF_NODE;
+
+    originalLeaf.selfPageNum = ixfileHandle.getNumberOfPages();
+    newLeaf.selfPageNum = ixfileHandle.getNumberOfPages() + 1;
+
+    newLeaf.familyDirectory.leftSibling = originLeaf.selfPageNum;
+    newLeaf.familyDirectory.rightSibling = originLeaf.familyDirectory.rightSibling;
+    newLeaf.familyDirectory.parent = originLeaf.familyDirectory.parent;
+
+    // take the subvector of the original node's keys and copy it to the new node
+    vector<void*>::const_iterator firstKey = originLeaf.keys.begin() + ceil(originLeaf.keys.size() / 2) + 1;
+    vector<void*>::const_iterator lastKey = originLeaf.keys.begin() + originLeaf.keys.size();
+    newLeaf.keys = vector<void*>(firstKey, lastKey);
+
+    // erase split values out of original node
+    originLeaf.keys.erase(originLeaf.keys.begin() + ceil(originLeaf.keys.size()/2) + 1, originLeaf.keys.begin() + originLeaf.keys.size());
+
+    // take the subvector of the original node's rids and copy it to the new node
+    vector<RID>::const_iterator firstRID = originLeaf.rids.begin() + ceil(originLeaf.rids.size() / 2) + 1;
+    vector<RID>::const_iterator lastRID = originLeaf.rids.begin() + originLeaf.rids.size();
+    newLeaf.rids = vector<RID>(firstRID, lastRID);
+
+    // erase split values out of original node
+    originLeaf.rids.erase(originLeaf.rids.begin() + ceil(originLeaf.rids.size()/2) + 1, originLeaf.rids.begin() + originLeaf.rids.size());
+
+    originLeaf.indexDirectory.numEntries = originLeaf.keys.size();
+    newLeaf.indexDirectory.numEntries = originLeaf.keys.size();
+
+    // recalculate Free space offset (difficult if varchar)
+    originLeaf.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(originLeaf, attribute);
+    newLeaf.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(newLeaf, attribute);
+
+    void *page = malloc(PAGE_SIZE);
+
+    // write nodes to new page and add to FS
+    originLeaf.writeToPage(page, attribute);
+    ixfileHandle.appendPage(page);
+
+    // write nodes to new page and add to FS
+    newLeaf.writeToPage(page, attribute);
+    ixfileHandle.appendPage(page);
+
+    // traffic cop is first key of new node (right sibling of origin)
+    void* trafficCop = malloc(attribute.length);
+    memcpy(trafficCop, newLeaf.keys[0], attribute.length);
+
+    return trafficCop;
 }
 
 void *IndexManager::splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, const Attribute &attribute){
