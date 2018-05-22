@@ -149,11 +149,10 @@ class IndexManager {
         void printKey(void *key, const Attribute &attribute) const;
 
         RC insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid, void *page, PageNum &pageNum);
-        RC insertIntoInterior(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid, void *page);
-        RC insertIntoLeaf(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, void *page);
         void *splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, const Attribute &attribute);
         void *splitRootLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, const Attribute &attribute);
         void *splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &originNode, InteriorNode &newNode, const Attribute &attribute);
+        void *splitRootInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &originNode, InteriorNode &newNode, const Attribute &attribute);
         uint32_t calculateFreeSpaceOffset(LeafNode &node, const Attribute &attribute);
         uint32_t calculateFreeSpaceOffset(InteriorNode &node, const Attribute &attribute);
 };
