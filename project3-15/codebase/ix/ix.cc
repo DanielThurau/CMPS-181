@@ -83,7 +83,26 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
 {
-    return -1;
+    void *page = malloc(PAGE_SIZE);
+    PageNum pageNum;
+    findPageWithKey(ixfileHandle, key, attribute, page, pageNum);
+    LeafNode *node = new LeafNode(page, attribute, pageNum);
+    // iterate through each key and rid pair in the node
+    for (size_t i = 0; i < node->keys.size(); i++) {
+        // if this key / rid pair matches the one supplied
+        if (compareAttributeValues(node->keys[i], key, attribute) == 0 &&
+            node->rids[i].pageNum == rid.pageNum && node->rids[i].slotNum == rid.slotNum) {
+            // remove it
+            node->keys.erase(node->keys.begin() + i);
+            node->rids.erase(node->rids.begin() + i);
+            node->writeToPage(page, attribute);
+            ixfileHandle.writePage(pageNum, page);
+            delete node;
+            return SUCCESS;
+        }
+    }
+    delete node;
+    return IX_KEY_NOT_FOUND;
 }
 
 
