@@ -75,7 +75,10 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
         node->writeToPage(page, attribute);
         ixfileHandle.writePage(pageNum, page);
     }else{
-
+        //IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid, void *page, PageNum &pageNum
+        if(insertAndSplit(ixfileHandle, attribute, key, rid, page, pageNum)){
+            return -1;
+        }
     }
     // else split and insert into page
 
@@ -418,6 +421,7 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
         // load page data into leafNode object
         LeafNode *node = new LeafNode(page, attribute, pageNum);
 
+        // if leaf page is not the root
         if(pageNum != 0){
             // add to vector even if it over fills the FSO
             if((rc = addEntryToLeafNode(*node, key, rid, attribute)) != SUCCESS){
