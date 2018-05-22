@@ -154,7 +154,7 @@ void IndexManager::printInteriorNode(IXFileHandle &ixfileHandle, const Attribute
     cout << spaces << "\"children\":[" << endl;
     for (size_t i = 0; i < node.pagePointers.size(); i++) {
         cout << string((depth + 1) * 4 - 1, ' ') << "{";
-        printTreeRecur(ixfileHandle, attribute, node.pagePointers[i], depth + 1);
+        printTreeRecur(ixfileHandle, attribute, node.pagePointers[i], depth);
         if (i < node.pagePointers.size() - 1) {
             cout << "}," << endl;
         }
@@ -555,6 +555,12 @@ unsigned IXFileHandle::getNumberOfPages(){
     return fileHandle->getNumberOfPages();
 }
 
+InteriorNode::~InteriorNode() {
+    for (void *cop: trafficCops) {
+        free(cop);
+    }
+}
+
 InteriorNode::InteriorNode(){}
 
 InteriorNode::InteriorNode(const void *page, const Attribute &attribute, PageNum pageNum) {
@@ -624,6 +630,12 @@ RC InteriorNode::writeToPage(void *page, const Attribute &attribute) {
         }
     }
     return SUCCESS;
+}
+
+LeafNode::~LeafNode() {
+    for (void *key: keys) {
+        free(key);
+    }
 }
 
 LeafNode::LeafNode(){}

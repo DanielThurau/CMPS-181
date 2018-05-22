@@ -45,6 +45,8 @@ typedef struct FamilyDirectory {
 
 class InteriorNode {
 public:
+    // destructor
+    ~InteriorNode();
     InteriorNode();
     InteriorNode(const void *page, const Attribute &attribute, PageNum pageNum);
     RC writeToPage(void *page, const Attribute &attribute);
@@ -59,6 +61,8 @@ public:
 
 class LeafNode {
 public:
+    // destructor
+    ~LeafNode();
     // page not created
     LeafNode();
     // load page data into class
