@@ -115,8 +115,23 @@ IndexManager: ------------------------------------------------------------------
 		value is returned on whether or not there is sufficient space in the node based on its freeSpaceOffset,
 		key_size, and the size of an RID.
 
+	bool canEntryFitInInteriorNode(InteriorNode node, const void *key, const Attribute &attribute):
+		The key is run through a switch statement to determine a value key_size based on the attribute's type. A truth
+		value is returned on whether or not there is sufficient space in the node based on its freeSpaceOffset,
+		key_size, and the size of an RID. It is exactly the same as canEntryFitInLeafNode() except for InteriorNode.
+
 	void addEntryToLeafNode(LeafNode &node, const void *key, const RID rid, const Attribute &attribute):
-		--------OVERFLOW STILL IN PROGRESS. HOLD OFF. --------------------------------
+		Adds the provided key and RID into LeafNode node. The key is copied into a duplicate key_cpy. The index to
+		insert the entry into is found using a lambda function, returning an iterator. The point where the iterator
+		resides is then used to add the new trafficCop and add the new pagePointer to node. The freeSpaceOffset is
+		updated accordingly and numEntries for node is incremented.
+
+	void addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &node, const void *key,
+	  const Attribute &attribute):
+		Adds the provided key and RID into InteriorNode node. The index to insert the entry into is found using a lambda
+		function, returning an iterator. The point where the iterator resides is then used to add the new trafficCop
+		and add the new pagePointer to node. The freeSpaceOffset is updated accordingly and numEntries for node is
+		incremented.
 
 	void setFamilyDirectory(void *page, FamilyDirectory &directory):
 		Uses memset() to copy the contents of directory into the supplied page.
@@ -133,7 +148,16 @@ IndexManager: ------------------------------------------------------------------
 		to split the leafNode and obtain the key which will be passed into the leafNode's parent, an interiorNode.
 		From here, the obtained key is passed into the parent node and insertAndSplit() is called recursively in
 		order to "bubble up" any further necessary splits.
-			If page contains an InteriorNode, THEN YOU NEED TO FINISH WRITING THIS LATER.
+			If page contains an InteriorNode, we create a corresponding InteriorNode node and then use
+		canEntryFitInInteriorNode() to see if we are able to fit the new key in. If we can, we add it using
+		addEntryToInteriorNode() and the simplest case is accomplished. If it does not fit, then we call the
+		function splitInteriorNode() to split the InteriorNode and obtain the key that will be passed up to node's
+		parent. InsertAndSplit() is then called recursively in order to "bubble up" any further necessary splits.
+
+	void splitRootLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
+	  const Attribute &attribute):
+		
+		
 
 	void splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
 	  const Attribute &attribute):
