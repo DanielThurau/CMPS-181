@@ -20,6 +20,7 @@
 #define IX_APPEND_FAILED     4
 #define IX_READ_FAILED       5
 #define IX_WRITE_FAILED      6 
+#define IX_FILE_NOT_OPENED   7
 
 #define IM_KEY_NOT_FOUND     1
 #define IM_ADD_ENTRY_FAILED  2
@@ -97,6 +98,9 @@ class IXFileHandle {
         unsigned ixReadPageCounter;
         unsigned ixWritePageCounter;
         unsigned ixAppendPageCounter;
+
+        // true if this file handle has been attached to a file
+        bool opened;
 
         FileHandle* fileHandle;
 

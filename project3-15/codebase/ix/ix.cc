@@ -57,12 +57,20 @@ RC IndexManager::destroyFile(const string &fileName)
 
 RC IndexManager::openFile(const string &fileName, IXFileHandle &ixfileHandle)
 {
-    return _pf_manager->openFile(fileName.c_str(), *ixfileHandle.fileHandle);
+    RC rc = _pf_manager->openFile(fileName.c_str(), *ixfileHandle.fileHandle);
+    if (rc == SUCCESS) {
+        ixfileHandle.opened = true;
+}
+    return rc;
 }
 
 RC IndexManager::closeFile(IXFileHandle &ixfileHandle)
 {
-    return _pf_manager->closeFile(*ixfileHandle.fileHandle);
+    RC rc = _pf_manager->closeFile(*ixfileHandle.fileHandle);
+    if (rc == SUCCESS) {
+        ixfileHandle.opened = false;
+    }
+    return rc;
 }
 
 RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid)
@@ -137,6 +145,9 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         bool        	highKeyInclusive,
         IX_ScanIterator &ix_ScanIterator)
 {
+    if (!ixfileHandle.opened) {
+        return IX_FILE_NOT_OPENED;
+    }
 
     return ix_ScanIterator.init(ixfileHandle, attribute, lowKey, highKey, lowKeyInclusive, highKeyInclusive);
 }
@@ -788,6 +799,7 @@ IXFileHandle::IXFileHandle() {
 
     fileHandle = new FileHandle();
 
+    opened = false;
 }
 
 IXFileHandle::~IXFileHandle() {
