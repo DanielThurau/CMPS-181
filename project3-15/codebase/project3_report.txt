@@ -158,11 +158,6 @@ IndexManager: ------------------------------------------------------------------
 		function splitInteriorNode() to split the InteriorNode and obtain the key that will be passed up to node's
 		parent. InsertAndSplit() is then called recursively in order to "bubble up" any further necessary splits.
 
-	void splitRootLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
-	  const Attribute &attribute):
-		
-		
-
 	void* splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
 	  const Attribute &attribute):
 		This function creates a new LeafNode from newLeaf. If originLeaf is the root, then we set its selfPageNum
@@ -225,27 +220,53 @@ IXFileHandle: ------------------------------------------------------------------
 
 InteriorNode: -------------------------------------------------------------------------------------------------------
 
+	selfPageNum:
+		The page which the InteriorNode resides on in the fileHandle.
+
 	indexDirectory:
+		The IndexDirectory containing the number of entries, the freeSpaceOffset for the InteriorNode's page,
+		and the node's type (INTERIOR_NODE).
 
 	familyDirectory:
+		The FamilyDirectory containing the node's leftSibling, rightSibling, and parent nodes.
 
 	trafficCops:
+		A vector of all "traffic cops" in the interiorNode: values which determine the placement of new entries
+		and guides the traversal of the B+ tree.
 
 	pagePointers:
+		A vector of all page pointers in the interiorNode: these are pointers to the pages containing keys which
+		are bounded by the values of the "surrounding" traffic cops.
 
-	writeToPage():
+	RC writeToPage(void *page, const Attribute &attribute):
+		Creates an IndexManager instance im to run setIndexDirectory() and setFamilyDirectory() for page. A pointer
+		is created immediately after the indexDirectory and familyDirectory. All members of the node's pagepointers
+		vector are then written to the page with memcpy(). Next, all members of the node's trafficCops vector are
+		written to the page based on the attribute's type.
 
 LeafNode: -----------------------------------------------------------------------------------------------------------
 
+	selfPageNum:
+		The page which the LeafNode resides on in the fileHandle.
+
 	indexDirectory:
+		The IndexDirectory containing the number of entries, the freeSpaceOffset for the LeafNode's page, and the
+		node's type (LEAF_NODE).
 
 	familyDirectory:
+		The FamilyDirectory containing the node's leftSibling, rightSibling, and parent nodes.
 
 	keys:
+		A vector of all key values contained in the node. This is kept dorted at all times.
 
 	rids:
+		A vector of all RIDs corresponding to the key values contained in the node.
 
 	writeToPage():
+		Creates an IndexManager instance im to run setIndexDirectory() and setFamilyDirectory() for page. A pointer
+		is created immediately after the indexDirectory and familyDirectory. Next, all members of the node's keys
+		vector are written to the page based on the attribute's type. Lastly, all members of the node's rids vector
+		are written to the page.
 
 5. Other (optional)
 - Freely use this section to tell us about things that are related to the project 3, but not related to the other sections (optional).  For example, if you chose to do the extra credit (non-lazy deletion), please tell us here what you did.
