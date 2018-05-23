@@ -979,6 +979,10 @@ RC LeafNode::writeToPage(void *page, const Attribute &attribute){
     return SUCCESS;
 }
 
+IX_ScanIterator::IX_ScanIterator() {
+
+}
+
 IX_ScanIterator::~IX_ScanIterator() {
     delete curNode;
 }
