@@ -490,6 +490,8 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
         delete node;
         delete newLeaf;
 
+        // if leaf was a root, we need to create a new root node
+        // and add the split nodes as children
         if(pageNum == 0){
 
             // Setting up the root page.
@@ -512,6 +514,8 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
             ixfileHandle.writePage(0, page);
 
             return SUCCESS;
+        // if leaf node was not root, read in its parent and 
+        // recursively call function
         }else{
             void *parentPage = malloc(PAGE_SIZE);
             if (parentPage == NULL)
@@ -519,7 +523,7 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
 
             if(ixfileHandle.readPage(node->familyDirectory.parent, parentPage))
                 return IX_READ_FAILED;
-            
+
            return insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent); 
         }
     }else{
