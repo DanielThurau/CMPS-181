@@ -163,19 +163,39 @@ IndexManager: ------------------------------------------------------------------
 		
 		
 
-	void splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
+	void* splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
 	  const Attribute &attribute):
-		This function creates a new LeafNode from newLeaf, sets newLeaf's leftSibling to the originLeaf, newLeaf's
-		rightSibling to originLeaf's rightSibling, and sets newLeaf's parent to originLeaf's parent; this
-		essentially puts a new LeafNode nestled right between the original leaf and its right sibling. newLeaf
-		takes the left "half" of originLeaf's keys vector (and the extra key if the vector had an odd number of keys)
-		and those same keys are removed from originLeaf's keys vector. The split values are then erased from the
-		originLeaf. calculateFreeSpace() is then run on both newLeaf and originLeaf to set their respective FSO's
-		to their updated values. Lastly, the new originLeaf and newLeaf are written back to their pages and the
-		"trafficCop" emerging from the split is returned.
+		This function creates a new LeafNode from newLeaf. If originLeaf is the root, then we set its selfPageNum
+		to the number of pages in the fileHandle and the newLeaf's to one more than that; otherwise, we set newLeaf's
+		selfPageNum to the number of pages in the fileHandle. The function then sets newLeaf's leftSibling to the
+		originLeaf, newLeaf's rightSibling to originLeaf's rightSibling, and sets newLeaf's parent to originLeaf's
+		parent; this essentially puts a new LeafNode nestled right between the original leaf and its right sibling.
+		newLeaf takes the left "half" of originLeaf's keys vector (and the extra key if the vector had an odd number
+		of keys) and those same keys are removed from originLeaf's keys vector. The split values are then erased from
+		the originLeaf. calculateFreeSpace() is then run on both newLeaf and originLeaf to set their respective FSO's
+		to their updated values. The new originLeaf is written back to the page. If originLeaf was the root, we use
+		appendPage() to append the page containing originLeaf to the fileHandle to ixFileHandle. If it was not the
+		root, then writePage() is used to write the page containing originLeaf to the selfPageNum. newLeaf is written
+		back to its pages and the "trafficCop" emerging from the split is returned.
+
+	void* splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &originNode, InteriorNode &newNode,
+	  const Attribute &attribute):
+		This function creates a new InteriorNode from newNode. If originNode is the root, then we set its selfPageNum
+		to the number of pages in the fileHandle and the newNode's to one more than that; otherwise, we set newLeaf's
+		selfPageNum to the number of pages in the fileHandle. The function then sets newNode's leftSibling to the
+		originNode, newNode's rightSibling to originNode's rightSibling, and sets newNode's parent to originNode's
+		parent; this essentially puts a new InteriorNode nestled right between the original InteriorNode and its right
+		sibling. newNode takes the left "half" of originNode's keys vector (and the extra key if the vector had an odd
+		number of keys) and those same keys are removed from originNode's keys vector. The split values are then erased
+		from the originNode. calculateFreeSpace() is then run on both newNode and originNode to set their respective
+		FSO's to their updated values. The new originNode is written back to the page. If originNode was the root, we
+		use appendPage() to append the page containing originNode to the fileHandle to ixFileHandle. If it was not the
+		root, then writePage() is used to write the page containing originNode to the selfPageNum. newNode is written
+		back to its pages and the "trafficCop" emerging from the split is returned.
 
 	uint32_t calculateFreeSpaceOffset(LeafNode &node, const Attribute &attribute):
-		The new FSO of node is calculated based on the attribute's type. The new FSO is returned.
+		The new FSO of node is calculated based on the attribute's type. The new FSO is returned. The same exact
+		functionality exists for this function's namesake for InteriorNode.
 
 	
 
