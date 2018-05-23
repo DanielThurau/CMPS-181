@@ -21,9 +21,9 @@
 #define IX_READ_FAILED       5
 #define IX_WRITE_FAILED      6 
 
-#define IX_KEY_NOT_FOUND     7
-#define IX_ADD_ENTRY_FAILED  8
-#define IX_SPLIT_FAILED      9
+#define IM_KEY_NOT_FOUND     1
+#define IM_ADD_ENTRY_FAILED  2
+#define IM_SPLIT_FAILED      3
 
 #define LN_WRITE_FAILED      1
 #define LN_ADD_FAILED        2
