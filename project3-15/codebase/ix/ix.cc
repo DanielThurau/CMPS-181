@@ -970,11 +970,12 @@ RC LeafNode::writeToPage(void *page, const Attribute &attribute){
 }
 
 IX_ScanIterator::IX_ScanIterator() {
-
+    curNode = nullptr;
 }
 
 IX_ScanIterator::~IX_ScanIterator() {
-    delete curNode;
+    if (curNode != nullptr)
+        delete curNode;
 }
 
 void IX_ScanIterator::init(IXFileHandle &ixfileHandle,
