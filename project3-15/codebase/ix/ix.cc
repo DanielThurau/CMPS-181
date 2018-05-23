@@ -137,8 +137,8 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         bool        	highKeyInclusive,
         IX_ScanIterator &ix_ScanIterator)
 {
-    ix_ScanIterator.init(ixfileHandle, attribute, lowKey, highKey, lowKeyInclusive, highKeyInclusive);
-    return SUCCESS;
+
+    return ix_ScanIterator.init(ixfileHandle, attribute, lowKey, highKey, lowKeyInclusive, highKeyInclusive);
 }
 
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
@@ -329,9 +329,11 @@ int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, c
 }
 
 // find the leaf page that a key belongs in
-void IndexManager::findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const Attribute &attribute, void *page, PageNum &pageNum) {
+RC IndexManager::findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const Attribute &attribute, void *page, PageNum &pageNum) {
     pageNum = 0;
-    ixfileHandle.readPage(pageNum, page);
+    if (ixfileHandle.readPage(pageNum, page) != SUCCESS) {
+        return IX_READ_FAILED;
+    }
     while (getNodeType(page) != LEAF_NODE) {
         InteriorNode *node = new InteriorNode(page, attribute, pageNum);
         uint32_t i = 0;
@@ -344,21 +346,29 @@ void IndexManager::findPageWithKey(IXFileHandle &ixfileHandle, const void *key, 
         if (i == node->indexDirectory.numEntries) {
             pageNum = node->pagePointers[node->indexDirectory.numEntries];
         }
-        ixfileHandle.readPage(pageNum, page);
+        if (ixfileHandle.readPage(pageNum, page) != SUCCESS) {
+            return IX_READ_FAILED;
+        }
         delete node;
     }
+    return SUCCESS;
 }
 
 // finds the leftmost leaf page
-void IndexManager::findIndexStart(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, PageNum &pageNum) {
+RC IndexManager::findIndexStart(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, PageNum &pageNum) {
     pageNum = 0;
-    ixfileHandle.readPage(pageNum, page);
+    if (ixfileHandle.readPage(pageNum, page) != SUCCESS) {
+        return IX_READ_FAILED;
+    }
     while(getNodeType(page) != LEAF_NODE) {
         InteriorNode *node = new InteriorNode(page, attribute, pageNum);
         pageNum = node->pagePointers[0];
-        ixfileHandle.readPage(pageNum, page);
+        if (ixfileHandle.readPage(pageNum, page) != SUCCESS) {
+            return IX_READ_FAILED;
+        }
         delete node;
     }
+    return SUCCESS;
 }
 
 bool IndexManager::canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute) {
@@ -989,7 +999,7 @@ IX_ScanIterator::~IX_ScanIterator() {
 
 }
 
-void IX_ScanIterator::init(IXFileHandle &ixfileHandle,
+RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
                 const Attribute &attribute,
                 const void *lowKey,
                 const void *highKey,
@@ -1005,7 +1015,9 @@ void IX_ScanIterator::init(IXFileHandle &ixfileHandle,
     PageNum pageNum;
     // if there's a low key provided
     if (lowKey != NULL) {
-        im->findPageWithKey(ixfileHandle, lowKey, attribute, page, pageNum);
+        if (im->findPageWithKey(ixfileHandle, lowKey, attribute, page, pageNum) != SUCCESS) {
+            return IX_READ_FAILED;
+        }
         curNode = new LeafNode(page, attribute, pageNum);
 
         // find first key in this page with value >= the low key
@@ -1017,7 +1029,9 @@ void IX_ScanIterator::init(IXFileHandle &ixfileHandle,
     }
     // else start at the beginning of the index
     else {
-        im->findIndexStart(ixfileHandle, attribute, page, pageNum);
+        if (im->findIndexStart(ixfileHandle, attribute, page, pageNum) != SUCCESS) {
+            return IX_READ_FAILED;
+        }
         curNode = new LeafNode(page, attribute, pageNum);
         cur_index = 0;
     }
@@ -1028,6 +1042,7 @@ void IX_ScanIterator::init(IXFileHandle &ixfileHandle,
     }
 
     free(page);
+    return SUCCESS;
 }
 
 // returns true when this iterator is done scanning

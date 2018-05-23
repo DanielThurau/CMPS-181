@@ -142,7 +142,7 @@ class IX_ScanIterator {
         // Get next matching entry
         RC getNextEntry(RID &rid, void *key);
 
-        void init(IXFileHandle &ixfileHandle,
+        RC init(IXFileHandle &ixfileHandle,
                 const Attribute &attribute,
                 const void *lowKey,
                 const void *highKey,
@@ -212,8 +212,8 @@ class IndexManager {
 
         NodeType getNodeType(const void *page) const;
         int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) const;
-        void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
-        void findIndexStart(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, PageNum &pageNum);
+        RC findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
+        RC findIndexStart(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, PageNum &pageNum);
 
         bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute);
         bool canEntryFitInInteriorNode(InteriorNode node, const void *key, const Attribute &attribute);
