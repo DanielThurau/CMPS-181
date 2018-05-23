@@ -213,6 +213,7 @@ class IndexManager {
         NodeType getNodeType(const void *page) const;
         int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) const;
         void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
+        void findIndexStart(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, PageNum &pageNum);
 
         bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute);
         bool canEntryFitInInteriorNode(InteriorNode node, const void *key, const Attribute &attribute);
