@@ -769,7 +769,7 @@ IXFileHandle::IXFileHandle() {
 
 IXFileHandle::~IXFileHandle() {
     fileHandle->~FileHandle();
-    free(fileHandle);
+    // free(fileHandle);
 }
 
 RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount) {
