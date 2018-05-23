@@ -83,7 +83,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
         // add entry into object representation
         if(addEntryToLeafNode(*node, key, rid, attribute))
-            return IX_ADD_ENTRY_FAILED;
+            return IM_ADD_ENTRY_FAILED;
         
         // write the 
         if(node->writeToPage(page, attribute))
@@ -93,7 +93,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     }else{
         // recursively call method that splits nodes    
         if(insertAndSplit(ixfileHandle, attribute, key, rid, page, pageNum))
-            return IX_SPLIT_FAILED;
+            return IM_SPLIT_FAILED;
     }
 
     free(page);
@@ -125,7 +125,7 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     }
     delete node;
     free(page);
-    return IX_KEY_NOT_FOUND;
+    return IM_KEY_NOT_FOUND;
 }
 
 
@@ -485,7 +485,7 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
         LeafNode *newLeaf = new LeafNode();
         
         if(splitLeafNode(ixfileHandle, *node, *newLeaf, newKey))
-            return IX_SPLIT_FAILED;
+            return IM_SPLIT_FAILED;
 
         // if leaf was a root, we need to create a new root node
         // and add the split nodes as children
@@ -502,13 +502,8 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
             if(addEntryToRootNode(ixfileHandle, *newRoot, newKey, ixfileHandle.getNumberOfPages()-1, ixfileHandle.getNumberOfPages() - 2))
                 return IN_ADD_FAILED;
 
-
-            void *page = malloc(PAGE_SIZE);
-            if(page == NULL)
-                return IX_MALLOC_FAILED; 
-
-            newRoot->writeToPage(page, attribute); // needs error checking
-            ixfileHandle.writePage(0, page);
+            newRoot->writeToPage(newPage, attribute); // needs error checking
+            ixfileHandle.writePage(0, newPage);
 
             return SUCCESS;
         // if leaf node was not root, read in its parent and 
@@ -542,7 +537,7 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
         InteriorNode *newNode = new InteriorNode();
         
         if(splitInteriorNode(ixfileHandle, *node, *newNode, newKey))
-            return IX_SPLIT_FAILED;
+            return IM_SPLIT_FAILED;
 
         if(pageNum == 0){
             // Setting up the root page.
@@ -556,13 +551,8 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
             if(addEntryToRootNode(ixfileHandle, *newRoot, newKey, ixfileHandle.getNumberOfPages()-1, ixfileHandle.getNumberOfPages() - 2))
                 return IN_ADD_FAILED;
 
-
-            void *page = malloc(PAGE_SIZE);
-            if(page == NULL)
-                return IX_MALLOC_FAILED; 
-
-            newRoot->writeToPage(page, attribute); // needs error checking
-            ixfileHandle.writePage(0, page);
+            newRoot->writeToPage(newPage, attribute); // needs error checking
+            ixfileHandle.writePage(0, newPage);
 
             return SUCCESS;
         // if node was not root, read in its parent and 
@@ -583,7 +573,7 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
 
 
     }
-    return -1;
+    return SUCCESS;
 }
 
 RC IndexManager::splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, void *newKey){
@@ -977,6 +967,10 @@ RC LeafNode::writeToPage(void *page, const Attribute &attribute){
     }
 
     return SUCCESS;
+}
+
+IX_ScanIterator::IX_ScanIterator() {
+
 }
 
 IX_ScanIterator::~IX_ScanIterator() {
