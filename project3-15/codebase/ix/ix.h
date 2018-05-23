@@ -20,6 +20,7 @@
 #define IX_APPEND_FAILED     4
 #define IX_READ_FAILED       5
 #define IX_WRITE_FAILED      6 
+
 #define IX_KEY_NOT_FOUND     7
 #define IX_ADD_ENTRY_FAILED  8
 #define IX_SPLIT_FAILED      9

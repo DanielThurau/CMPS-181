@@ -763,8 +763,12 @@ uint32_t IndexManager::calculateFreeSpaceOffset(InteriorNode &node){
     return FSO;
 }
 
-IXFileHandle::IXFileHandle()
-{
+
+/*
+ *IXFileHandle Methods
+ */
+
+IXFileHandle::IXFileHandle() {
     ixReadPageCounter = 0;
     ixWritePageCounter = 0;
     ixAppendPageCounter = 0;
@@ -773,50 +777,46 @@ IXFileHandle::IXFileHandle()
 
 }
 
-IXFileHandle::~IXFileHandle()
-{
+IXFileHandle::~IXFileHandle() {
     fileHandle->~FileHandle();
     free(fileHandle);
 }
 
-RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
-{
+RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount) {
     readPageCount = ixReadPageCounter;
     writePageCount = ixWritePageCounter;
     appendPageCount = ixAppendPageCounter;
-    return 0;
+    return SUCCESS;
 }
 
-RC IXFileHandle::readPage(PageNum pageNum, void *data){
-    RC rc = fileHandle->readPage(pageNum, data);
-    if(rc){
-        return 1;
-    }
+RC IXFileHandle::readPage(PageNum pageNum, void *data) {
+    if(fileHandle->readPage(pageNum, data))
+        return IX_READ_FAILED;
     ixReadPageCounter++;
-    return 0;
+    return SUCCESS;
 }
 
-RC IXFileHandle::writePage(PageNum pageNum, const void *data){
-    RC rc = fileHandle->writePage(pageNum, data);
-    if(rc){
-        return 1;
-    }
+RC IXFileHandle::writePage(PageNum pageNum, const void *data) {
+    if(fileHandle->writePage(pageNum, data))
+        return IX_WRITE_FAILED;
     ixWritePageCounter++;
-    return 0;
+    return SUCCESS;
 }   
 
-RC IXFileHandle::appendPage(const void *data){
-    RC rc = fileHandle->appendPage(data);
-    if(rc){
-        return 1;
-    }
+RC IXFileHandle::appendPage(const void *data) {
+    if(fileHandle->appendPage(data))
+        return IX_APPEND_FAILED;
     ixAppendPageCounter++;
-    return 0;
+    return SUCCESS;
 }   
 
-unsigned IXFileHandle::getNumberOfPages(){
+unsigned IXFileHandle::getNumberOfPages() {
     return fileHandle->getNumberOfPages();
 }
+
+/*
+ * InteriorNode Methods
+ */ 
 
 InteriorNode::~InteriorNode() {
     for (void *cop: trafficCops) {
@@ -824,7 +824,7 @@ InteriorNode::~InteriorNode() {
     }
 }
 
-InteriorNode::InteriorNode(){}
+InteriorNode::InteriorNode() {}
 
 InteriorNode::InteriorNode(const void *page, const Attribute &attrib, PageNum pageNum) {
     IndexManager *im = IndexManager::instance();
