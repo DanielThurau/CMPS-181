@@ -40,11 +40,15 @@ IndexManager: ------------------------------------------------------------------
 	RC insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
 		Uses the findPageWithKey() method to find the pageNum of the leafNode where the entry belongs if it
 		is successfully inserted. We then use canEntryFitInLeafNode() to verify if the leafNode has the room
-		to house the new entry.
-		----------OVERFLOW STILL IN PROGRESS.----------
+		to house the new entry. If it does, then we use addEntryToLeafNode() to add the entry to the LeafNode.
+		If it does not, then we must split the tree to make room, so we call insertAndSplit(). At the end,
+		page is freed and SUCCESS is returned.
 
 	RC deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid):
-		Blah.
+		We use findPageWithKey() to find the page which contains the LeafNode holding key, for which we create
+		a corresponding LeafNode node. From here, we iterate through the keys vector of node and using
+		compareAttributeValues(), we find the member which exactly matches key. When we find it, the key and
+		corresponding rid are removed from the vector and the resultant page is written back with writeToPage().
 
 	RC scan(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *lowKey, const void *highKey,
           bool lowKeyInclusive, bool highKeyInclusive, IX_ScanIterator &ix_ScanIterator):
@@ -154,24 +158,39 @@ IndexManager: ------------------------------------------------------------------
 		function splitInteriorNode() to split the InteriorNode and obtain the key that will be passed up to node's
 		parent. InsertAndSplit() is then called recursively in order to "bubble up" any further necessary splits.
 
-	void splitRootLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
+	void* splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
 	  const Attribute &attribute):
-		
-		
+		This function creates a new LeafNode from newLeaf. If originLeaf is the root, then we set its selfPageNum
+		to the number of pages in the fileHandle and the newLeaf's to one more than that; otherwise, we set newLeaf's
+		selfPageNum to the number of pages in the fileHandle. The function then sets newLeaf's leftSibling to the
+		originLeaf, newLeaf's rightSibling to originLeaf's rightSibling, and sets newLeaf's parent to originLeaf's
+		parent; this essentially puts a new LeafNode nestled right between the original leaf and its right sibling.
+		newLeaf takes the left "half" of originLeaf's keys vector (and the extra key if the vector had an odd number
+		of keys) and those same keys are removed from originLeaf's keys vector. The split values are then erased from
+		the originLeaf. calculateFreeSpace() is then run on both newLeaf and originLeaf to set their respective FSO's
+		to their updated values. The new originLeaf is written back to the page. If originLeaf was the root, we use
+		appendPage() to append the page containing originLeaf to the fileHandle to ixFileHandle. If it was not the
+		root, then writePage() is used to write the page containing originLeaf to the selfPageNum. newLeaf is written
+		back to its pages and the "trafficCop" emerging from the split is returned.
 
-	void splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
+	void* splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &originNode, InteriorNode &newNode,
 	  const Attribute &attribute):
-		This function creates a new LeafNode from newLeaf, sets newLeaf's leftSibling to the originLeaf, newLeaf's
-		rightSibling to originLeaf's rightSibling, and sets newLeaf's parent to originLeaf's parent; this
-		essentially puts a new LeafNode nestled right between the original leaf and its right sibling. newLeaf
-		takes the left "half" of originLeaf's keys vector (and the extra key if the vector had an odd number of keys)
-		and those same keys are removed from originLeaf's keys vector. The split values are then erased from the
-		originLeaf. calculateFreeSpace() is then run on both newLeaf and originLeaf to set their respective FSO's
-		to their updated values. Lastly, the new originLeaf and newLeaf are written back to their pages and the
-		"trafficCop" emerging from the split is returned.
+		This function creates a new InteriorNode from newNode. If originNode is the root, then we set its selfPageNum
+		to the number of pages in the fileHandle and the newNode's to one more than that; otherwise, we set newLeaf's
+		selfPageNum to the number of pages in the fileHandle. The function then sets newNode's leftSibling to the
+		originNode, newNode's rightSibling to originNode's rightSibling, and sets newNode's parent to originNode's
+		parent; this essentially puts a new InteriorNode nestled right between the original InteriorNode and its right
+		sibling. newNode takes the left "half" of originNode's keys vector (and the extra key if the vector had an odd
+		number of keys) and those same keys are removed from originNode's keys vector. The split values are then erased
+		from the originNode. calculateFreeSpace() is then run on both newNode and originNode to set their respective
+		FSO's to their updated values. The new originNode is written back to the page. If originNode was the root, we
+		use appendPage() to append the page containing originNode to the fileHandle to ixFileHandle. If it was not the
+		root, then writePage() is used to write the page containing originNode to the selfPageNum. newNode is written
+		back to its pages and the "trafficCop" emerging from the split is returned.
 
 	uint32_t calculateFreeSpaceOffset(LeafNode &node, const Attribute &attribute):
-		The new FSO of node is calculated based on the attribute's type. The new FSO is returned.
+		The new FSO of node is calculated based on the attribute's type. The new FSO is returned. The same exact
+		functionality exists for this function's namesake for InteriorNode.
 
 	
 
@@ -201,27 +220,53 @@ IXFileHandle: ------------------------------------------------------------------
 
 InteriorNode: -------------------------------------------------------------------------------------------------------
 
+	selfPageNum:
+		The page which the InteriorNode resides on in the fileHandle.
+
 	indexDirectory:
+		The IndexDirectory containing the number of entries, the freeSpaceOffset for the InteriorNode's page,
+		and the node's type (INTERIOR_NODE).
 
 	familyDirectory:
+		The FamilyDirectory containing the node's leftSibling, rightSibling, and parent nodes.
 
 	trafficCops:
+		A vector of all "traffic cops" in the interiorNode: values which determine the placement of new entries
+		and guides the traversal of the B+ tree.
 
 	pagePointers:
+		A vector of all page pointers in the interiorNode: these are pointers to the pages containing keys which
+		are bounded by the values of the "surrounding" traffic cops.
 
-	writeToPage():
+	RC writeToPage(void *page, const Attribute &attribute):
+		Creates an IndexManager instance im to run setIndexDirectory() and setFamilyDirectory() for page. A pointer
+		is created immediately after the indexDirectory and familyDirectory. All members of the node's pagepointers
+		vector are then written to the page with memcpy(). Next, all members of the node's trafficCops vector are
+		written to the page based on the attribute's type.
 
 LeafNode: -----------------------------------------------------------------------------------------------------------
 
+	selfPageNum:
+		The page which the LeafNode resides on in the fileHandle.
+
 	indexDirectory:
+		The IndexDirectory containing the number of entries, the freeSpaceOffset for the LeafNode's page, and the
+		node's type (LEAF_NODE).
 
 	familyDirectory:
+		The FamilyDirectory containing the node's leftSibling, rightSibling, and parent nodes.
 
 	keys:
+		A vector of all key values contained in the node. This is kept dorted at all times.
 
 	rids:
+		A vector of all RIDs corresponding to the key values contained in the node.
 
 	writeToPage():
+		Creates an IndexManager instance im to run setIndexDirectory() and setFamilyDirectory() for page. A pointer
+		is created immediately after the indexDirectory and familyDirectory. Next, all members of the node's keys
+		vector are written to the page based on the attribute's type. Lastly, all members of the node's rids vector
+		are written to the page.
 
 5. Other (optional)
 - Freely use this section to tell us about things that are related to the project 3, but not related to the other sections (optional).  For example, if you chose to do the extra credit (non-lazy deletion), please tell us here what you did.
