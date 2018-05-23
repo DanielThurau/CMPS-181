@@ -143,6 +143,13 @@ IndexManager: ------------------------------------------------------------------
 	void getFamilyDirectory(const void *page, FamilyDirectory &directory):
 		Uses memset() to copy the contents of page into the supplied directory.
 
+	RC addEntryToRootNode(IXFileHandle &ixfileHandle, InteriorNode &node, void *key, PageNum leftChild,
+	  PageNum rightChild):
+		Finds the key size based on the attribute type contained in node (assumed root). We add the key
+		to the end of node's keys vector. leftChild and rightChild are added to node's pagePointers vector in
+		that order. node's freeSpaceOffset is updated to include the new key and the two new pages added.
+		Lastly, node's numEntries is incremented by one accordingly.
+
 	RC insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid,
 	  void *page, PageNum &pageNum):
 		This method has two courses of action based on the node that the page parameter represents.
@@ -257,7 +264,7 @@ LeafNode: ----------------------------------------------------------------------
 		The FamilyDirectory containing the node's leftSibling, rightSibling, and parent nodes.
 
 	keys:
-		A vector of all key values contained in the node. This is kept dorted at all times.
+		A vector of all key values contained in the node. This is kept sorted at all times.
 
 	rids:
 		A vector of all RIDs corresponding to the key values contained in the node.
