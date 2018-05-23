@@ -77,8 +77,68 @@ public:
     vector<RID> rids;
 };
 
-class IX_ScanIterator;
-class IXFileHandle;
+class IXFileHandle {
+    public:
+
+        // variables to keep counter for each operation
+        unsigned ixReadPageCounter;
+        unsigned ixWritePageCounter;
+        unsigned ixAppendPageCounter;
+
+        FileHandle* fileHandle;
+
+        // Constructor
+        IXFileHandle();
+
+        // Destructor
+        ~IXFileHandle();
+
+    	// Put the current counter values of associated PF FileHandles into variables
+    	RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);
+        RC readPage(PageNum pageNum, void *data);                           // Get a specific page
+        RC writePage(PageNum pageNum, const void *data);                    // Write a specific page
+        RC appendPage(const void *data);                                    // Append a specific page
+        unsigned getNumberOfPages();
+
+};
+
+class IndexManager;
+
+class IX_ScanIterator {
+    private:
+        IXFileHandle ixfileHandle;
+        Attribute attribute;
+        const void *highKey;
+        bool highKeyInclusive;
+
+        LeafNode *curNode;
+        IndexManager *im;
+        size_t cur_index;        
+        
+        bool at_end();
+        void advance();
+
+    public:
+
+		// Constructor
+        IX_ScanIterator();
+
+        // Destructor
+        ~IX_ScanIterator();
+
+        // Get next matching entry
+        RC getNextEntry(RID &rid, void *key);
+
+        void init(IXFileHandle &ixfileHandle,
+                const Attribute &attribute,
+                const void *lowKey,
+                const void *highKey,
+                bool lowKeyInclusive,
+                bool highKeyInclusive);
+
+        // Terminate index scan
+        RC close();
+};
 
 class IndexManager {
 
@@ -117,6 +177,7 @@ class IndexManager {
 
         friend class InteriorNode;
         friend class LeafNode;
+        friend class IX_ScanIterator;
 
     protected:
         IndexManager();
@@ -153,48 +214,5 @@ class IndexManager {
         uint32_t calculateFreeSpaceOffset(LeafNode &node, const Attribute &attribute);
 };
 
-
-class IX_ScanIterator {
-    public:
-
-		// Constructor
-        IX_ScanIterator();
-
-        // Destructor
-        ~IX_ScanIterator();
-
-        // Get next matching entry
-        RC getNextEntry(RID &rid, void *key);
-
-        // Terminate index scan
-        RC close();
-};
-
-
-
-class IXFileHandle {
-    public:
-
-        // variables to keep counter for each operation
-        unsigned ixReadPageCounter;
-        unsigned ixWritePageCounter;
-        unsigned ixAppendPageCounter;
-
-        FileHandle* fileHandle;
-
-        // Constructor
-        IXFileHandle();
-
-        // Destructor
-        ~IXFileHandle();
-
-    	// Put the current counter values of associated PF FileHandles into variables
-    	RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);
-        RC readPage(PageNum pageNum, void *data);                           // Get a specific page
-        RC writePage(PageNum pageNum, const void *data);                    // Write a specific page
-        RC appendPage(const void *data);                                    // Append a specific page
-        unsigned getNumberOfPages();
-
-};
 
 #endif

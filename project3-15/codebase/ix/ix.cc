@@ -98,10 +98,12 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
             node->writeToPage(page, attribute);
             ixfileHandle.writePage(pageNum, page);
             delete node;
+            free(page);
             return SUCCESS;
         }
     }
     delete node;
+    free(page);
     return IX_KEY_NOT_FOUND;
 }
 
@@ -114,7 +116,8 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         bool        	highKeyInclusive,
         IX_ScanIterator &ix_ScanIterator)
 {
-    return -1;
+    ix_ScanIterator.init(ixfileHandle, attribute, lowKey, highKey, lowKeyInclusive, highKeyInclusive);
+    return SUCCESS;
 }
 
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
@@ -480,26 +483,6 @@ RC IndexManager::insertIntoLeaf(IXFileHandle &ixfileHandle, const Attribute &att
     return -1;
 }
 
-
-IX_ScanIterator::IX_ScanIterator()
-{
-}
-
-IX_ScanIterator::~IX_ScanIterator()
-{
-}
-
-RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
-{
-    return -1;
-}
-
-RC IX_ScanIterator::close()
-{
-    return -1;
-}
-
-
 IXFileHandle::IXFileHandle()
 {
     ixReadPageCounter = 0;
@@ -711,5 +694,104 @@ RC LeafNode::writeToPage(void *page, const Attribute &attribute){
         cur_offset += sizeof(RID);
     }
 
+    return SUCCESS;
+}
+
+IX_ScanIterator::~IX_ScanIterator() {
+    delete curNode;
+}
+
+void IX_ScanIterator::init(IXFileHandle &ixfileHandle,
+                const Attribute &attribute,
+                const void *lowKey,
+                const void *highKey,
+                bool lowKeyInclusive,
+                bool highKeyInclusive) {
+    im = IndexManager::instance();
+
+    this->attribute = attribute;
+    this->highKey = highKey;
+    this->highKeyInclusive = highKeyInclusive;
+
+    void *page = malloc(PAGE_SIZE);
+    PageNum pageNum;
+    im->findPageWithKey(ixfileHandle, lowKey, attribute, page, pageNum);
+    curNode = new LeafNode(page, attribute, pageNum);
+
+    // find first key in this page with value >= the low key
+    auto pred = [&](void *item) { return im->compareAttributeValues(item, lowKey, attribute) >= 0; };
+    cur_index = distance(
+        curNode->keys.begin(),
+        find_if(curNode->keys.begin(), curNode->keys.end(), pred)
+    );
+
+    // if low key isn't inclusive and the first key selected is equal to the low key, advance
+    if (!lowKeyInclusive && im->compareAttributeValues(curNode->keys[cur_index], lowKey, attribute) == 0) {
+        advance();
+    }
+
+    free(page);
+}
+
+// returns true when this iterator is done scanning
+bool IX_ScanIterator::at_end() {
+    // if we're all the way at the end of the tree, we're done
+    if (cur_index == curNode->keys.size() && curNode->familyDirectory.rightSibling == -1) {
+        return true;
+    }
+
+    if (highKeyInclusive) {
+        return im->compareAttributeValues(curNode->keys[cur_index], highKey, attribute) > 0;
+    }
+    else {
+        return im->compareAttributeValues(curNode->keys[cur_index], highKey, attribute) >= 0;
+    }
+}
+
+// move to the next entry in the tree, switching pages if necessary
+void IX_ScanIterator::advance() {
+    if (at_end()) return;
+
+    if (cur_index < curNode->keys.size()) {
+        cur_index++;
+    }
+    else {
+        void *page = malloc(PAGE_SIZE);
+        PageNum pageNum = curNode->familyDirectory.rightSibling;
+        delete curNode;
+        ixfileHandle.readPage(pageNum, page);
+        curNode = new LeafNode(page, attribute, pageNum);
+        cur_index = 0;
+        free(page);
+    }
+}
+ 
+RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
+    if (at_end()) {
+        return IX_EOF;
+    }
+
+    // copy from node into key
+    switch(attribute.type) {
+    case TypeInt:
+    case TypeReal:
+        memcpy(key, curNode->keys[cur_index], attribute.length);
+        break;
+    case TypeVarChar: {
+        uint32_t varchar_length;
+        memcpy(&varchar_length, curNode->keys[cur_index], VARCHAR_LENGTH_SIZE);
+        memcpy(key, curNode->keys[cur_index], VARCHAR_LENGTH_SIZE + varchar_length);
+        break;
+    }
+    }
+
+    rid = curNode->rids[cur_index];
+
+    advance();
+    return SUCCESS;
+}
+
+RC IX_ScanIterator::close() {
+    delete this;
     return SUCCESS;
 }
