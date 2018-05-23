@@ -14,13 +14,21 @@
 
 #define SUCCESS 0
 
-#define IX_CREATE_FAILED  1
-#define IX_MALLOC_FAILED  2
-#define IX_OPEN_FAILED    3
-#define IX_APPEND_FAILED  4
-#define IX_READ_FAILED    5
-#define IX_WRITE_FAILED   6
-#define IX_KEY_NOT_FOUND  7
+#define IX_CREATE_FAILED     1
+#define IX_MALLOC_FAILED     2
+#define IX_OPEN_FAILED       3
+#define IX_APPEND_FAILED     4
+#define IX_READ_FAILED       5
+#define IX_WRITE_FAILED      6 
+#define IX_KEY_NOT_FOUND     7
+#define IX_ADD_ENTRY_FAILED  8
+#define IX_SPLIT_FAILED      9
+
+#define LN_WRITE_FAILED      1
+#define LN_ADD_FAILED        2
+
+#define IN_WRITE_FAILED      1
+#define IN_ADD_FAILED        2
 
 typedef enum {
     INTERIOR_NODE = 0,
@@ -48,10 +56,12 @@ public:
     // destructor
     ~InteriorNode();
     InteriorNode();
-    InteriorNode(const void *page, const Attribute &attribute, PageNum pageNum);
+    InteriorNode(const void *page, const Attribute &attrib, PageNum pageNum);
     RC writeToPage(void *page, const Attribute &attribute);
 
     PageNum selfPageNum;
+    Attribute attribute;
+
     IndexDirectory  indexDirectory;
     FamilyDirectory familyDirectory;
 
@@ -66,10 +76,12 @@ public:
     // page not created
     LeafNode();
     // load page data into class
-    LeafNode(const void *page, const Attribute &attribute, PageNum pageNum);
+    LeafNode(const void *page, const Attribute &attrib, PageNum pageNum);
     RC writeToPage(void *page, const Attribute &attribute);
 
     PageNum selfPageNum;
+    Attribute attribute;
+
     IndexDirectory  indexDirectory;
     FamilyDirectory familyDirectory;
 
@@ -194,15 +206,18 @@ class IndexManager {
         void getIndexDirectory(const void *page, IndexDirectory &directory) const;
         void setIndexDirectory(void *page, IndexDirectory &directory);
 
+        void getFamilyDirectory(const void *page, FamilyDirectory &directory) const;
+        void setFamilyDirectory(void *page, FamilyDirectory &directory);
+
         NodeType getNodeType(const void *page) const;
         int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) const;
         void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
-        void getFamilyDirectory(const void *page, FamilyDirectory &directory);
-        void setFamilyDirectory(void *page, FamilyDirectory &directory);
+
         bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute);
         bool canEntryFitInInteriorNode(InteriorNode node, const void *key, const Attribute &attribute);
         RC addEntryToLeafNode(LeafNode &node, const void *key, RID rid, const Attribute &attribute);
         RC addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &node, const void *key, const Attribute &attribute);
+        RC addEntryToRootNode(IXFileHandle &ixfileHandle, InteriorNode &node, void *key, PageNum leftChild, PageNum rightChild);
 
         void printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &attribute, PageNum pageNum, int depth) const;
         void printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth) const;
@@ -210,10 +225,10 @@ class IndexManager {
         void printKey(void *key, const Attribute &attribute) const;
 
         RC insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid, void *page, PageNum &pageNum);
-        void *splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, const Attribute &attribute);
-        void *splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &originNode, InteriorNode &newNode, const Attribute &attribute);
-        uint32_t calculateFreeSpaceOffset(LeafNode &node, const Attribute &attribute);
-        uint32_t calculateFreeSpaceOffset(InteriorNode &node, const Attribute &attribute);
+        RC splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, void *newKey);
+        RC splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &originNode, InteriorNode &newNode, void *newKey);
+        uint32_t calculateFreeSpaceOffset(LeafNode &node);
+        uint32_t calculateFreeSpaceOffset(InteriorNode &node);
 };
 
 
