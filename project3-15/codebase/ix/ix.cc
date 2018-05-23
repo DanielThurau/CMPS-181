@@ -371,7 +371,7 @@ RC IndexManager::findIndexStart(IXFileHandle &ixfileHandle, const Attribute &att
     return SUCCESS;
 }
 
-bool IndexManager::canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute) {
+bool IndexManager::canEntryFitInLeafNode(LeafNode &node, const void *key, const Attribute &attribute) {
     uint32_t key_size;
     switch(attribute.type) {
     case TypeInt:
@@ -387,7 +387,7 @@ bool IndexManager::canEntryFitInLeafNode(LeafNode node, const void *key, const A
     return PAGE_SIZE - node.indexDirectory.freeSpaceOffset > key_size + sizeof(RID);
 }
 
-bool IndexManager::canEntryFitInInteriorNode(InteriorNode node, const void *key, const Attribute &attribute) {
+bool IndexManager::canEntryFitInInteriorNode(InteriorNode &node, const void *key, const Attribute &attribute) {
     uint32_t key_size;
     switch(attribute.type) {
     case TypeInt:

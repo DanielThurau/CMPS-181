@@ -215,8 +215,8 @@ class IndexManager {
         RC findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
         RC findIndexStart(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, PageNum &pageNum);
 
-        bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute);
-        bool canEntryFitInInteriorNode(InteriorNode node, const void *key, const Attribute &attribute);
+        bool canEntryFitInLeafNode(LeafNode &node, const void *key, const Attribute &attribute);
+        bool canEntryFitInInteriorNode(InteriorNode &node, const void *key, const Attribute &attribute);
         RC addEntryToLeafNode(LeafNode &node, const void *key, RID rid, const Attribute &attribute);
         RC addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &node, const void *key, const Attribute &attribute);
         RC addEntryToRootNode(IXFileHandle &ixfileHandle, InteriorNode &node, void *key, PageNum leftChild, PageNum rightChild);
