@@ -143,6 +143,13 @@ IndexManager: ------------------------------------------------------------------
 	void getFamilyDirectory(const void *page, FamilyDirectory &directory):
 		Uses memset() to copy the contents of page into the supplied directory.
 
+	RC addEntryToRootNode(IXFileHandle &ixfileHandle, InteriorNode &node, void *key, PageNum leftChild,
+	  PageNum rightChild):
+		Finds the key size based on the attribute type contained in node (assumed root). We add the key
+		to the end of node's keys vector. leftChild and rightChild are added to node's pagePointers vector in
+		that order. node's freeSpaceOffset is updated to include the new key and the two new pages added.
+		Lastly, node's numEntries is incremented by one accordingly.
+
 	RC insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid,
 	  void *page, PageNum &pageNum):
 		This method has two courses of action based on the node that the page parameter represents.
@@ -150,13 +157,22 @@ IndexManager: ------------------------------------------------------------------
 		corresponding leafNode, whether it will overflow the free space offset (FSO) or not; the overflow does
 		not matter since we know we will be splitting this vector in half. From there, we call splitLeafNode()
 		to split the leafNode and obtain the key which will be passed into the leafNode's parent, an interiorNode.
-		From here, the obtained key is passed into the parent node and insertAndSplit() is called recursively in
-		order to "bubble up" any further necessary splits.
+		From here, we check if pageNum is 0, indicating if the leafNode was the root. If it is the root, then we
+		create a new InteriorNode newRoot to represent the new root. We call addEntryToRootNode() to set up the
+		new node within the context of the tree write the results back to newRoot with writeToPage(). Lastly, we
+		write the results to ixFileHandle and return SUCCESS since no further recursion should be necessary at the
+		root. If the leafNode does NOT indicate the root, we set up its parent page and insertAndSplit() is called
+		recursively in order to "bubble up" any further necessary splits.
 			If page contains an InteriorNode, we create a corresponding InteriorNode node and then use
 		canEntryFitInInteriorNode() to see if we are able to fit the new key in. If we can, we add it using
-		addEntryToInteriorNode() and the simplest case is accomplished. If it does not fit, then we call the
-		function splitInteriorNode() to split the InteriorNode and obtain the key that will be passed up to node's
-		parent. InsertAndSplit() is then called recursively in order to "bubble up" any further necessary splits.
+		addEntryToInteriorNode() and the simplest case is accomplished. If it does not fit, then we still call
+		addEntryToInteriorNode() but follow it with splitInteriorNode() to split the InteriorNode and obtain the
+		key that will be passed up to node's parent. Similarly to the LeafNode case, we check if pageNum is 0, which
+		would indicate if the InteriorNode is the root. We call addEntryToRootNode() to set up the new node within
+		the context of the tree write the results back to newRoot with writeToPage(). Lastly, we write the results
+		to ixFileHandle and return SUCCESS since no further recursion should be necessary at the root. If the
+		InteriorNode does NOT indicate the root, we set up its parent page and insertAndSplit() is then called
+		recursively in order to "bubble up" any further necessary splits. 
 
 	void* splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf,
 	  const Attribute &attribute):
@@ -192,15 +208,7 @@ IndexManager: ------------------------------------------------------------------
 		The new FSO of node is calculated based on the attribute's type. The new FSO is returned. The same exact
 		functionality exists for this function's namesake for InteriorNode.
 
-	
-
 IXFileHandle: -------------------------------------------------------------------------------------------------------
-
-	RC getNextEntry(RID &rid, void *key):
-		Blah.
-
-	RC close():
-		Blah.
 
 	RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount):
 		Sets readPageCount to the ixReadPageCounter of the IXFileHandle, writePageCount to the ixWritePageCounter,
@@ -257,16 +265,41 @@ LeafNode: ----------------------------------------------------------------------
 		The FamilyDirectory containing the node's leftSibling, rightSibling, and parent nodes.
 
 	keys:
-		A vector of all key values contained in the node. This is kept dorted at all times.
+		A vector of all key values contained in the node. This is kept sorted at all times.
 
 	rids:
 		A vector of all RIDs corresponding to the key values contained in the node.
 
-	writeToPage():
+	RC writeToPage(void *page, const Attribute &attribute):
 		Creates an IndexManager instance im to run setIndexDirectory() and setFamilyDirectory() for page. A pointer
 		is created immediately after the indexDirectory and familyDirectory. Next, all members of the node's keys
 		vector are written to the page based on the attribute's type. Lastly, all members of the node's rids vector
 		are written to the page.
+
+IX_ScanIterator: -----------------------------------------------------------------------------------------------------
+
+	void init(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *lowKey, const void *highKey,
+	  bool lowKeyInclusive, bool highKeyInclusive):
+		Creates an IndexManagerInstance im and sets attribute, highKey and highKeyInclusive to the respective values
+		for the iterator. We then find the page containing the lowest key with findPageWithKey() and set a new
+		object curNode to the LeafNode contained in that page. We find the first key in the page with a value less
+		than or equal to lowKey. If lowKeyInclusive is false and the first key selected is equal to the low key,
+		we advance the IX_ScanIterator.
+
+	bool at_end():
+		Checks to see if the end of the tree has been reached by the iterator. If so, we return true.
+
+	void advance():
+		Advances the iterator to the next entry in the tree by either moving to the next entry in the page or
+		switching to the next page in the sequence.
+
+	RC getNextEntry(RID &rid, void *key):
+		Checks to see if we are past all entries in the tree and exits if that is the case. Otherwise, we obtain
+		the contents of the next entry based on its attribute's type and set rid to the RID corresponding to the
+		key that was obtained.
+
+	RC close():
+		Deletes the iterator.
 
 5. Other (optional)
 - Freely use this section to tell us about things that are related to the project 3, but not related to the other sections (optional).  For example, if you chose to do the extra credit (non-lazy deletion), please tell us here what you did.
