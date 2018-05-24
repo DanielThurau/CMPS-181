@@ -563,50 +563,56 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
         if (canEntryFitInInteriorNode(*node, key, attribute)) {
             if(addEntryToInteriorNode(ixfileHandle, *node, key, attribute))
                 return IN_ADD_FAILED;
-
-            return SUCCESS;
-        // 
-        }
-
-        if(addEntryToInteriorNode(ixfileHandle, *node, key, attribute))
-            return IN_ADD_FAILED;
-        
-        // reference to empty leafNode object that will be split into
-        InteriorNode *newNode = new InteriorNode();
-        
-        if(splitInteriorNode(ixfileHandle, *node, *newNode, newKey))
-            return IM_SPLIT_FAILED;
-
-        if(pageNum == 0){
-            // Setting up the root page.
+            
             void *newPage = malloc(PAGE_SIZE);
             if (newPage == NULL)
                 return IX_MALLOC_FAILED;
 
-            newInteriorBasedPage(newPage, -1, -1, 0);
 
-            InteriorNode *newRoot = new InteriorNode(newPage, attribute, 0);
-            if(addEntryToRootNode(ixfileHandle, *newRoot, newKey, ixfileHandle.getNumberOfPages()-1, ixfileHandle.getNumberOfPages() - 2))
-                return IN_ADD_FAILED;
+            node->writeToPage(newPage, attribute); // needs error checking
+            ixfileHandle.writePage(node->selfPageNum, newPage);
 
-            newRoot->writeToPage(newPage, attribute); // needs error checking
-            ixfileHandle.writePage(0, newPage);
 
             return SUCCESS;
-        // if node was not root, read in its parent and 
-        // recursively call function
+        // 
         }else{
-            void *parentPage = malloc(PAGE_SIZE);
-            if (parentPage == NULL)
-                return IX_MALLOC_FAILED;
 
-            if(ixfileHandle.readPage(node->familyDirectory.parent, parentPage))
-                return IX_READ_FAILED;
-
-            return insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent); 
-        }
-        return SUCCESS;
+            // reference to empty leafNode object that will be split into
+            InteriorNode *newNode = new InteriorNode();
             
+            if(splitInteriorNode(ixfileHandle, *node, *newNode, newKey))
+                return IM_SPLIT_FAILED;
+
+            if(pageNum == 0){
+                // Setting up the root page.
+                void *newPage = malloc(PAGE_SIZE);
+                if (newPage == NULL)
+                    return IX_MALLOC_FAILED;
+
+                newInteriorBasedPage(newPage, -1, -1, 0);
+
+                InteriorNode *newRoot = new InteriorNode(newPage, attribute, 0);
+                if(addEntryToRootNode(ixfileHandle, *newRoot, newKey, ixfileHandle.getNumberOfPages()-1, ixfileHandle.getNumberOfPages() - 2))
+                    return IN_ADD_FAILED;
+
+                newRoot->writeToPage(newPage, attribute); // needs error checking
+                ixfileHandle.writePage(0, newPage);
+
+                return SUCCESS;
+            // if node was not root, read in its parent and 
+            // recursively call function
+            }else{
+                void *parentPage = malloc(PAGE_SIZE);
+                if (parentPage == NULL)
+                    return IX_MALLOC_FAILED;
+
+                if(ixfileHandle.readPage(node->familyDirectory.parent, parentPage))
+                    return IX_READ_FAILED;
+
+                return insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent); 
+            }
+            return SUCCESS;
+        }
         
 
 
@@ -684,6 +690,8 @@ RC IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &ori
 
     //set obvious directory values
     newNode.indexDirectory.type = INTERIOR_NODE;
+    newNode.attribute = originNode.attribute;
+
 
     if(originNode.selfPageNum == 0){
         originNode.selfPageNum = ixfileHandle.getNumberOfPages();
