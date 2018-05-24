@@ -1,4 +1,8 @@
 *.o
 *.a
-binary.py
+
+# morgans editor
 *.vscode*
+
+# project three index files
+*_idx
