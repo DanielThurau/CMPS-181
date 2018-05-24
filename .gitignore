@@ -7,6 +7,7 @@
 # project three index files
 *_idx
 
+# Project 3 executables
 ixtest_01
 ixtest_02
 ixtest_03
@@ -23,3 +24,6 @@ ixtest_13
 ixtest_14
 ixtest_15
 ixtest_dan
+
+# Dans run script
+run.sh
