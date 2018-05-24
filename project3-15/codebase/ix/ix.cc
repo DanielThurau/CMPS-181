@@ -1065,11 +1065,10 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
     free(page);
     return SUCCESS;
 }
-
 // returns true when this iterator is done scanning
 bool IX_ScanIterator::at_end() {
     // if we're all the way at the end of the tree, we're done
-    if (cur_index == curNode->keys.size() && curNode->familyDirectory.rightSibling == -1) {
+    if (cur_index == curNode->keys.size()) {
         return true;
     }
 
@@ -1090,10 +1089,10 @@ bool IX_ScanIterator::at_end() {
 void IX_ScanIterator::advance() {
     if (at_end()) return;
 
-    if (cur_index < curNode->keys.size()) {
+    if (cur_index < curNode->keys.size() - 1) {
         cur_index++;
     }
-    else {
+    else if (curNode->familyDirectory.rightSibling != -1) {
         void *page = malloc(PAGE_SIZE);
         PageNum pageNum = curNode->familyDirectory.rightSibling;
         delete curNode;
@@ -1101,6 +1100,9 @@ void IX_ScanIterator::advance() {
         curNode = new LeafNode(page, attribute, pageNum);
         cur_index = 0;
         free(page);
+    }
+    else {
+        cur_index++;
     }
 }
  

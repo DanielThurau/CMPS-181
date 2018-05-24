@@ -1,20 +1,34 @@
 1. Basic information
-Team number (e.g., 01) : 
-#1 Submitter ID : 
-#1 Student Name : 
-
-
+Team number (e.g., 01) : 15
+#1 Submitter ID : 1403225
+#1 Student Name : mlgrant
 
 2. Index Entry Format
 - Show your index entry design (structure). 
 
+	Our B+ tree design consists of a file handle whose first page (pageNum = 0) is always
+	maintained as its root. All new nodes are added by appending their corresponding pages 
+	to the end of the file handle.
+		All pages/nodes have an IndexDirectory which contains the number of entries that
+	it contains (numEntries), its free space offset (freeSpaceOffset) and its NodeType (type).
+		All pages/nodes also have a FamilyDirectory which contains the PageNum of its
+	parent (parent), the offset of its left sibling page (leftSibling) as well as its right
+	(rightSibling). 
 
 3. Page Format
 - Show your internal-page (non-leaf node) design.
 
+	We created an InteriorNode class. They exist in the following format/order:
+	| indexDirectory | familyDirectory | trafficCops | pagePointers | Free Space ... |
+
+	All of these objects are elaborated in the Implementation Detail for InteriorNode.
 
 - Show your leaf-page (leaf node) design.
 
+	We created a LeafNode class. They exist in the following format/order:
+	| indexDirectory | familyDirectory | keys | rids | Free Space ... |
+
+	All of these objects are elaborated in the Implementation Detail for LeafNode.
 
 4. Implementation Detail
 - Have you added your own source file (.cc or .h)?
