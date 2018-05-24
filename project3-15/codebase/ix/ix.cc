@@ -158,7 +158,7 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
     cout << "{" << endl;
     printTreeRecur(ixfileHandle, attribute, 0, 0);
-    cout << "}" << endl;
+    cout << endl << "}" << endl;
     
 }
 
@@ -168,12 +168,12 @@ void IndexManager::printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &a
     ixfileHandle.readPage(pageNum, page);
     if (getNodeType(page) == LEAF_NODE) {
         LeafNode *node = new LeafNode(page, attribute, pageNum);
-        printLeafNode(ixfileHandle, attribute, *node, depth + 1);
+        printLeafNode(ixfileHandle, attribute, *node, depth);
         delete node;
     }
     else {
         InteriorNode *node = new InteriorNode(page, attribute, pageNum);
-        printInteriorNode(ixfileHandle, attribute, *node, depth + 1);
+        printInteriorNode(ixfileHandle, attribute, *node, depth);
         delete node;
     }
 }
@@ -193,7 +193,7 @@ void IndexManager::printInteriorNode(IXFileHandle &ixfileHandle, const Attribute
     cout << spaces << "\"children\":[" << endl;
     for (size_t i = 0; i < node.pagePointers.size(); i++) {
         cout << string((depth + 1) * 4 - 1, ' ') << "{";
-        printTreeRecur(ixfileHandle, attribute, node.pagePointers[i], depth);
+        printTreeRecur(ixfileHandle, attribute, node.pagePointers[i], depth + 1);
         if (i < node.pagePointers.size() - 1) {
             cout << "}," << endl;
         }
@@ -660,9 +660,6 @@ RC IndexManager::splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf,
     // recalculate Free space offset (difficult if varchar)
     originLeaf.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(originLeaf);
     newLeaf.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(newLeaf);
-
-    // set new leaf's attribute
-    newLeaf.attribute = originLeaf.attribute;
 
     void *page = malloc(PAGE_SIZE);
 
