@@ -155,17 +155,18 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     return ix_ScanIterator.init(ixfileHandle, attribute, lowKey, highKey, lowKeyInclusive, highKeyInclusive);
 }
 
+// top level print just calls printTreeRecur on page 0, with depth 0
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
     cout << "{" << endl;
     printTreeRecur(ixfileHandle, attribute, 0, 0);
     cout << endl << "}" << endl;
-    
 }
 
-
+// recursively print an index tree
 void IndexManager::printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &attribute, PageNum pageNum, int depth) const {
     void *page = malloc(PAGE_SIZE);
     ixfileHandle.readPage(pageNum, page);
+    // gets the node type of the given page and calls the appropriate node printing function
     if (getNodeType(page) == LEAF_NODE) {
         LeafNode *node = new LeafNode(page, attribute, pageNum);
         printLeafNode(ixfileHandle, attribute, *node, depth);
@@ -176,10 +177,14 @@ void IndexManager::printTreeRecur(IXFileHandle &ixfileHandle, const Attribute &a
         printInteriorNode(ixfileHandle, attribute, *node, depth);
         delete node;
     }
+    free(page);
 }
 
+// print an interior node and all of its children
 void IndexManager::printInteriorNode(IXFileHandle &ixfileHandle, const Attribute &attribute, InteriorNode &node, int depth) const {
+    // used for indenting
     string spaces = string(depth * 4, ' ');
+    // print keys
     cout << "\"keys\":[";
     for (size_t i = 0; i < node.trafficCops.size(); i++) {
         cout << "\"";
@@ -190,9 +195,12 @@ void IndexManager::printInteriorNode(IXFileHandle &ixfileHandle, const Attribute
         }
     }
     cout << "]," << endl;
+    // print children
     cout << spaces << "\"children\":[" << endl;
     for (size_t i = 0; i < node.pagePointers.size(); i++) {
         cout << string((depth + 1) * 4 - 1, ' ') << "{";
+        // call printTreeRecur on all children
+        // very unlikely that this will cause a stack overflow since tree is almost always only be a few levels deep
         printTreeRecur(ixfileHandle, attribute, node.pagePointers[i], depth + 1);
         if (i < node.pagePointers.size() - 1) {
             cout << "}," << endl;
@@ -204,16 +212,21 @@ void IndexManager::printInteriorNode(IXFileHandle &ixfileHandle, const Attribute
     cout << spaces << "]";
 }
 
+// print a leaf node
 void IndexManager::printLeafNode(IXFileHandle &ixfileHandle, const Attribute &attribute, LeafNode &node, int depth) const {
     cout << "\"keys\": [";
     for (size_t i = 0; i < node.keys.size();) {
         cout << "\"";
+        // print this key
         printKey(node.keys[i], attribute);
         cout << ":[";
         void *cur_key = node.keys[i];
+        // loop to find repeated keys so RIDs for the same key can be printed together
         for (;;) {
+            // print RID
             cout << "(" << node.rids[i].pageNum << "," << node.rids[i].slotNum << ")";
             i++;
+            // if this isn't the end of the keys array and the next value is the same as the previous one, keep going
             if (i < node.keys.size() && compareAttributeValues(cur_key, node.keys[i], attribute) == 0) {
                 cout << ",";
             }
@@ -229,6 +242,7 @@ void IndexManager::printLeafNode(IXFileHandle &ixfileHandle, const Attribute &at
     cout << "]";
 }
 
+// print a key
 void IndexManager::printKey(void *key, const Attribute &attribute) const {
     switch(attribute.type) {
     case TypeInt:
@@ -313,6 +327,8 @@ NodeType IndexManager::getNodeType(const void *page) const {
     return directory.type;
 }
 
+// compare two keys
+// returns negative if key 1 is less than key 2, 0 if they're equal, and positive if key 1 is greater than key 2
 int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) const {
     switch (attribute.type) {
     case TypeInt:
@@ -326,6 +342,7 @@ int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, c
         if (fkey_1 > fkey_2) return 1;
     }
     case TypeVarChar:  {
+        // turn varchars into c strings
         uint32_t len_1;
         uint32_t len_2;
         memcpy(&len_1, key_1, VARCHAR_LENGTH_SIZE);
@@ -336,6 +353,7 @@ int IndexManager::compareAttributeValues(const void *key_1, const void *key_2, c
         memcpy(key_2_str, (uint8_t *) key_2 + VARCHAR_LENGTH_SIZE, len_2);
         key_1_str[len_1] = '\0';
         key_2_str[len_2] = '\0';
+        // use strcmp to do comparison
         return strcmp(key_1_str, key_2_str);
     }
     }
@@ -349,16 +367,21 @@ RC IndexManager::findPageWithKey(IXFileHandle &ixfileHandle, const void *key, co
     if (ixfileHandle.readPage(pageNum, page) != SUCCESS) {
         return IX_READ_FAILED;
     }
+    // move down the tree until we reach a leaf node
     while (getNodeType(page) != LEAF_NODE) {
         InteriorNode *node = new InteriorNode(page, attribute, pageNum);
         uint32_t i = 0;
+        // find first entry in traffic cops that's greater than the key
         for (; i < node->indexDirectory.numEntries; i++) {
             if (compareAttributeValues(key, node->trafficCops[i], attribute) < 0) {
+                // use the page pointer to the left of the found key
                 pageNum = node->pagePointers[i];
                 break;
             }
         }
+        // if we made it all the way to the end of the traffic cops
         if (i == node->indexDirectory.numEntries) {
+            // use the rightmost page pointer
             pageNum = node->pagePointers[node->indexDirectory.numEntries];
         }
         if (ixfileHandle.readPage(pageNum, page) != SUCCESS) {
@@ -377,6 +400,7 @@ RC IndexManager::findIndexStart(IXFileHandle &ixfileHandle, const Attribute &att
     }
     while(getNodeType(page) != LEAF_NODE) {
         InteriorNode *node = new InteriorNode(page, attribute, pageNum);
+        // always follow the leftmost page pointer
         pageNum = node->pagePointers[0];
         if (ixfileHandle.readPage(pageNum, page) != SUCCESS) {
             return IX_READ_FAILED;
@@ -386,6 +410,7 @@ RC IndexManager::findIndexStart(IXFileHandle &ixfileHandle, const Attribute &att
     return SUCCESS;
 }
 
+// is there enough room in a leaf node to add a key?
 bool IndexManager::canEntryFitInLeafNode(LeafNode &node, const void *key, const Attribute &attribute) {
     uint32_t key_size;
     switch(attribute.type) {
@@ -402,6 +427,7 @@ bool IndexManager::canEntryFitInLeafNode(LeafNode &node, const void *key, const 
     return PAGE_SIZE - node.indexDirectory.freeSpaceOffset > key_size + sizeof(RID);
 }
 
+// is there enough room in an interior node to add a key?
 bool IndexManager::canEntryFitInInteriorNode(InteriorNode &node, const void *key, const Attribute &attribute) {
     uint32_t key_size;
     switch(attribute.type) {
@@ -418,7 +444,9 @@ bool IndexManager::canEntryFitInInteriorNode(InteriorNode &node, const void *key
     return PAGE_SIZE - node.indexDirectory.freeSpaceOffset > key_size + sizeof(PageNum);
 }
 
+// add a key / RID pair to a leaf node
 RC IndexManager::addEntryToLeafNode(LeafNode &node, const void *key, const RID rid, const Attribute &attribute) {
+    // copy the key
     uint32_t key_size;
     switch(attribute.type) {
     case TypeInt:
@@ -434,22 +462,25 @@ RC IndexManager::addEntryToLeafNode(LeafNode &node, const void *key, const RID r
     void *key_cpy = malloc(key_size);
     memcpy(key_cpy, key, key_size);
 
-    // find index to do inserted index at
-    // a masterpiece
+    // find index to do sorted insert at
     auto cmp_func = [&](const void *a, const void *b){ return compareAttributeValues(a, b, attribute) < 0; };
     int insertion_index = distance(
         node.keys.begin(),
         upper_bound(node.keys.begin(), node.keys.end(), key, cmp_func)
     );
 
+    // add key and RID to node
     node.keys.insert(node.keys.begin() + insertion_index, key_cpy);
     node.rids.insert(node.rids.begin() + insertion_index, rid);
     node.indexDirectory.freeSpaceOffset += key_size + sizeof(RID);
     node.indexDirectory.numEntries++;
+
     return SUCCESS;
 }
 
+// add a new key to an interior node
 RC IndexManager::addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &node, const void *key, const Attribute &attribute) {
+    // copy key
     uint32_t key_size;
     switch(attribute.type) {
     case TypeInt:
@@ -465,18 +496,19 @@ RC IndexManager::addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode
     void *key_cpy = malloc(key_size);
     memcpy(key_cpy, key, key_size);
 
-    // find index to do inserted index at
-    // a masterpiece
+    // find index to do sorted insert at
     auto cmp_func = [&](const void *a, const void *b){ return compareAttributeValues(a, b, attribute) < 0; };
     int insertion_index = distance(
         node.trafficCops.begin(),
         upper_bound(node.trafficCops.begin(), node.trafficCops.end(), key, cmp_func)
     );
 
+    // insert new key
     node.trafficCops.insert(node.trafficCops.begin() + insertion_index, key_cpy);
     node.pagePointers.insert(node.pagePointers.begin() + insertion_index + 1, ixfileHandle.getNumberOfPages() - 1);
     node.indexDirectory.freeSpaceOffset += key_size + sizeof(PageNum);
     node.indexDirectory.numEntries++;
+
     return SUCCESS;
 }
 
@@ -489,9 +521,7 @@ RC IndexManager::addEntryToRootNode(IXFileHandle &ixfileHandle, InteriorNode &no
     return SUCCESS;
 }
 
-
-
-
+// insert an entry into the node at the given page number and split if necessary
 RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid, void *page, PageNum &pageNum){
     void *newKey = malloc(attribute.length);
     if (newKey == NULL)
@@ -531,6 +561,11 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
             newRoot->writeToPage(newPage, attribute); // needs error checking
             ixfileHandle.writePage(0, newPage);
 
+            free(newPage);
+            delete node;
+            delete newLeaf;
+            delete newRoot;
+
             return SUCCESS;
         // if leaf node was not root, read in its parent and 
         // recursively call function
@@ -542,7 +577,10 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
             if(ixfileHandle.readPage(node->familyDirectory.parent, parentPage))
                 return IX_READ_FAILED;
 
-           return insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent); 
+            RC rc = insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent); 
+            delete newLeaf;
+            free(parentPage);
+            return rc;
         }
     }else{
         InteriorNode *node = new InteriorNode(page, attribute, pageNum);
@@ -560,9 +598,10 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
             node->writeToPage(newPage, attribute); // needs error checking
             ixfileHandle.writePage(node->selfPageNum, newPage);
 
-
+            free(newPage);
+            delete node;
             return SUCCESS;
-        // 
+
         }else{
 
             if(addEntryToInteriorNode(ixfileHandle, *node, key, attribute))
@@ -571,8 +610,6 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
 
             // reference to empty leafNode object that will be split into
             InteriorNode *newNode = new InteriorNode();
-                
-
 
             if(splitInteriorNode(ixfileHandle, *node, *newNode, newKey))
                 return IM_SPLIT_FAILED;
@@ -592,6 +629,11 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
                 newRoot->writeToPage(newPage, attribute); // needs error checking
                 ixfileHandle.writePage(0, newPage);
 
+                free(newPage);
+                delete node;
+                delete newRoot;
+                delete newNode;
+
                 return SUCCESS;
             // if node was not root, read in its parent and 
             // recursively call function
@@ -603,7 +645,13 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
                 if(ixfileHandle.readPage(node->familyDirectory.parent, parentPage))
                     return IX_READ_FAILED;
 
-                return insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent); 
+                RC rc = insertAndSplit(ixfileHandle, attribute, newKey, rid, parentPage, node->familyDirectory.parent); 
+
+                free(parentPage);
+                delete node;
+                delete newNode;
+
+                return rc;
             }
             return SUCCESS;
         }
@@ -676,13 +724,10 @@ RC IndexManager::splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf,
     return SUCCESS;
 }
 
-
 RC IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &originNode, InteriorNode &newNode, void *newKey){
-
     //set obvious directory values
     newNode.indexDirectory.type = INTERIOR_NODE;
     newNode.attribute = originNode.attribute;
-
 
     if(originNode.selfPageNum == 0){
         originNode.selfPageNum = ixfileHandle.getNumberOfPages();
@@ -692,13 +737,11 @@ RC IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &ori
         newNode.selfPageNum = ixfileHandle.getNumberOfPages();
     }
 
-
     newNode.familyDirectory.leftSibling = originNode.selfPageNum;
     newNode.familyDirectory.rightSibling = originNode.familyDirectory.rightSibling;
     newNode.familyDirectory.parent = originNode.familyDirectory.parent;
 
     originNode.familyDirectory.rightSibling = newNode.selfPageNum;
-
 
     // take the subvector of the original node's keys and copy it to the new node
     vector<void*>::const_iterator firstKey = originNode.trafficCops.begin() + ceil(originNode.trafficCops.size() / 2) + 1;
@@ -728,10 +771,7 @@ RC IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &ori
     originNode.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(originNode);
     newNode.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(newNode);
 
-    
-
     void *page = malloc(PAGE_SIZE);
-
 
     originNode.writeToPage(page, originNode.attribute);
     if(originNode.selfPageNum == ixfileHandle.getNumberOfPages()){
@@ -746,10 +786,8 @@ RC IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &ori
     newNode.writeToPage(page, newNode.attribute);
     ixfileHandle.appendPage(page);
 
-
     return SUCCESS;
 }
-
 
 uint32_t IndexManager::calculateFreeSpaceOffset(LeafNode &node){
     uint32_t FSO = 0;
@@ -864,6 +902,7 @@ InteriorNode::~InteriorNode() {
 
 InteriorNode::InteriorNode() {}
 
+// construct an interior node object from a page
 InteriorNode::InteriorNode(const void *page, const Attribute &attrib, PageNum pageNum) {
     IndexManager *im = IndexManager::instance();
 
@@ -906,6 +945,7 @@ InteriorNode::InteriorNode(const void *page, const Attribute &attrib, PageNum pa
     }
 }
 
+// write the contents of this node object to a page
 RC InteriorNode::writeToPage(void *page, const Attribute &attribute) {
     IndexManager *im = IndexManager::instance();
 
@@ -914,11 +954,13 @@ RC InteriorNode::writeToPage(void *page, const Attribute &attribute) {
 
     // pointer to current point in page
     uint8_t *cur_offset = (uint8_t*) page + sizeof(indexDirectory) + sizeof(familyDirectory);
+    // add page pointers to page
     for (uint32_t i = 0; i < indexDirectory.numEntries + 1; i++) {
         memcpy(cur_offset, &pagePointers[i], sizeof(PageNum));
         cur_offset += sizeof(PageNum);
     }
 
+    // add traffic cops to page
     for (uint32_t i = 0; i < indexDirectory.numEntries; i++) {
         switch(attribute.type) {
         case TypeInt:
@@ -945,6 +987,7 @@ LeafNode::~LeafNode() {
 
 LeafNode::LeafNode(){}
 
+// construct a leaf node object from a page
 LeafNode::LeafNode(const void *page, const Attribute &attrib, PageNum pageNum){
     IndexManager *im = IndexManager::instance();
 
@@ -986,6 +1029,7 @@ LeafNode::LeafNode(const void *page, const Attribute &attrib, PageNum pageNum){
 
 }
 
+// write this node object back to a page
 RC LeafNode::writeToPage(void *page, const Attribute &attribute){
     IndexManager *im = IndexManager::instance();
 
@@ -1028,6 +1072,7 @@ IX_ScanIterator::~IX_ScanIterator() {
 
 }
 
+// initialize the scanner
 RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
                 const Attribute &attribute,
                 const void *lowKey,
@@ -1099,9 +1144,11 @@ bool IX_ScanIterator::at_end() {
 void IX_ScanIterator::advance() {
     if (at_end()) return;
 
+    // if there are still entries in this page, then just advance current index
     if (cur_index < curNode->keys.size() - 1) {
         cur_index++;
     }
+    // if there are no more entries in this page, but there is another page to scan, load that page
     else if (curNode->familyDirectory.rightSibling != -1) {
         void *page = malloc(PAGE_SIZE);
         PageNum pageNum = curNode->familyDirectory.rightSibling;
@@ -1111,6 +1158,7 @@ void IX_ScanIterator::advance() {
         cur_index = 0;
         free(page);
     }
+    // else we're done, just increment cur_index so that at_end see that we're done
     else {
         cur_index++;
     }
