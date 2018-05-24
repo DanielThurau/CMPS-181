@@ -6,14 +6,12 @@ Team number (e.g., 01) : 15
 2. Index Entry Format
 - Show your index entry design (structure). 
 
-	Our B+ tree design consists of a file handle whose first page (pageNum = 0) is always
-	maintained as its root. All new nodes are added by appending their corresponding pages 
-	to the end of the file handle.
-		All pages/nodes have an IndexDirectory which contains the number of entries that
-	it contains (numEntries), its free space offset (freeSpaceOffset) and its NodeType (type).
-		All pages/nodes also have a FamilyDirectory which contains the PageNum of its
-	parent (parent), the offset of its left sibling page (leftSibling) as well as its right
-	(rightSibling). 
+	Our B+ tree design consists of a file handle whose first page (pageNum = 0) is always maintained as its
+	root. All new nodes are added by appending their corresponding pages to the end of the file handle. All
+	pages/nodes have an IndexDirectory which contains the number of entries that it contains (numEntries),
+	its free space offset (freeSpaceOffset) and its NodeType (type). All pages/nodes also have a
+	FamilyDirectory which contains the PageNum of its parent (parent), the offset of its left sibling page
+	(leftSibling) as well as its right (rightSibling). 
 
 3. Page Format
 - Show your internal-page (non-leaf node) design.
@@ -158,10 +156,9 @@ IndexManager: ------------------------------------------------------------------
 
 	RC addEntryToRootNode(IXFileHandle &ixfileHandle, InteriorNode &node, void *key, PageNum leftChild,
 	  PageNum rightChild):
-		Finds the key size based on the attribute type contained in node (assumed root). We add the key
-		to the end of node's keys vector. leftChild and rightChild are added to node's pagePointers vector in
-		that order. node's freeSpaceOffset is updated to include the new key and the two new pages added.
-		Lastly, node's numEntries is incremented by one accordingly.
+		Adds the key to the end of node's keys vector. leftChild and rightChild are added to node's pagePointers vector
+		in that order. node's freeSpaceOffset is updated with calculateFreeSpaceOffset(). Lastly, node's numEntries is
+		incremented by one accordingly.
 
 	RC insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID rid,
 	  void *page, PageNum &pageNum):
