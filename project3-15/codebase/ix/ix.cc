@@ -215,7 +215,7 @@ void IndexManager::printLeafNode(IXFileHandle &ixfileHandle, const Attribute &at
             }
             else break;
         }
-        if (i < node.keys.size() - 1) {
+        if (i < node.keys.size()) {
             cout << "]\",";
         }
         else {
@@ -533,7 +533,7 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
             newInteriorBasedPage(newPage, -1, -1, 0);
 
             InteriorNode *newRoot = new InteriorNode(newPage, attribute, 0);
-            if(addEntryToRootNode(ixfileHandle, *newRoot, newKey, ixfileHandle.getNumberOfPages()-1, ixfileHandle.getNumberOfPages() - 2))
+            if(addEntryToRootNode(ixfileHandle, *newRoot, newKey, ixfileHandle.getNumberOfPages()-2, ixfileHandle.getNumberOfPages() - 1))
                 return IN_ADD_FAILED;
 
             newRoot->writeToPage(newPage, attribute); // needs error checking
@@ -624,6 +624,8 @@ RC IndexManager::splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf,
     newLeaf.familyDirectory.leftSibling = originLeaf.selfPageNum;
     newLeaf.familyDirectory.rightSibling = originLeaf.familyDirectory.rightSibling;
     newLeaf.familyDirectory.parent = originLeaf.familyDirectory.parent;
+
+    originLeaf.familyDirectory.rightSibling = newLeaf.selfPageNum;
 
     // take the subvector of the original node's keys and copy it to the new node
     vector<void*>::const_iterator firstKey = originLeaf.keys.begin() + ceil(originLeaf.keys.size() / 2) + 1;
@@ -863,6 +865,9 @@ InteriorNode::InteriorNode(const void *page, const Attribute &attrib, PageNum pa
     selfPageNum = pageNum;
     attribute = attrib;
 
+    // if there aren't any entries, then don't bother copying traffic cops or page pointers
+    if (indexDirectory.numEntries == 0) return;
+
     // pointer to current point in page
     uint8_t *cur_offset = (uint8_t*) page + sizeof(indexDirectory) + sizeof(familyDirectory);
     // copy page pointers out of page
@@ -1025,6 +1030,7 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
     this->attribute = attribute;
     this->highKey = highKey;
     this->highKeyInclusive = highKeyInclusive;
+    this->ixfileHandle = ixfileHandle;
 
     void *page = malloc(PAGE_SIZE);
     PageNum pageNum;
