@@ -1,12 +1,3 @@
-#include <algorithm>
-#include <cmath>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <iomanip>
-#include <iostream>
-#include <string>
-
 #include "rbfm.h"
 
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = NULL;

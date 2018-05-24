@@ -1,9 +1,16 @@
 #ifndef _rbfm_h_
 #define _rbfm_h_
 
-#include <string>
 #include <vector>
 #include <climits>
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <iomanip>
+#include <iostream>
+#include <string>
 
 #include "../rbf/pfm.h"
 
