@@ -719,7 +719,7 @@ RC IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &ori
     originNode.pagePointers.erase(originNode.pagePointers.begin() + ceil(originNode.pagePointers.size()/2) + 1, originNode.pagePointers.begin() + originNode.pagePointers.size());
 
     originNode.indexDirectory.numEntries = originNode.trafficCops.size();
-    newNode.indexDirectory.numEntries = originNode.trafficCops.size();
+    newNode.indexDirectory.numEntries = newNode.trafficCops.size();
 
     // recalculate Free space offset (difficult if varchar)
     originNode.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(originNode);
@@ -1075,6 +1075,7 @@ RC IX_ScanIterator::init(IXFileHandle &ixfileHandle,
     free(page);
     return SUCCESS;
 }
+
 // returns true when this iterator is done scanning
 bool IX_ScanIterator::at_end() {
     // if we're all the way at the end of the tree, we're done
