@@ -124,6 +124,9 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
             // remove it
             node->keys.erase(node->keys.begin() + i);
             node->rids.erase(node->rids.begin() + i);
+            node->indexDirectory.numEntries--;
+            node->indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(*node);
+
             node->writeToPage(page, attribute);
             ixfileHandle.writePage(pageNum, page);
             delete node;
@@ -155,7 +158,8 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
     cout << "{" << endl;
     printTreeRecur(ixfileHandle, attribute, 0, 0);
-    cout << endl << "}" << endl;
+    cout << "}" << endl;
+    
 }
 
 
@@ -613,6 +617,7 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
 RC IndexManager::splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf, LeafNode &newLeaf, void *newKey){
     //set obvious directory values
     newLeaf.indexDirectory.type = LEAF_NODE;
+    newLeaf.attribute = originLeaf.attribute;
 
     if(originLeaf.selfPageNum == 0){
         originLeaf.selfPageNum = ixfileHandle.getNumberOfPages();
