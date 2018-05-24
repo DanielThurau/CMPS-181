@@ -124,14 +124,13 @@ IndexManager: ------------------------------------------------------------------
 		value is returned on whether or not there is sufficient space in the node based on its freeSpaceOffset,
 		key_size, and the size of an RID. It is exactly the same as canEntryFitInLeafNode() except for InteriorNode.
 
-	void addEntryToLeafNode(LeafNode &node, const void *key, const RID rid, const Attribute &attribute):
+	RC addEntryToLeafNode(LeafNode &node, const void *key, const RID rid, const Attribute &attribute):
 		Adds the provided key and RID into LeafNode node. The key is copied into a duplicate key_cpy. The index to
 		insert the entry into is found using a lambda function, returning an iterator. The point where the iterator
 		resides is then used to add the new trafficCop and add the new pagePointer to node. The freeSpaceOffset is
 		updated accordingly and numEntries for node is incremented.
 
-	void addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &node, const void *key,
-	  const Attribute &attribute):
+	RC addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &node, const void *key, const Attribute &attribute):
 		Adds the provided key and RID into InteriorNode node. The index to insert the entry into is found using a lambda
 		function, returning an iterator. The point where the iterator resides is then used to add the new trafficCop
 		and add the new pagePointer to node. The freeSpaceOffset is updated accordingly and numEntries for node is

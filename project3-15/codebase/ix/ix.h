@@ -20,6 +20,7 @@
 #define IX_APPEND_FAILED     4
 #define IX_READ_FAILED       5
 #define IX_WRITE_FAILED      6 
+#define IX_FILE_NOT_OPENED   7
 
 #define IM_KEY_NOT_FOUND     1
 #define IM_ADD_ENTRY_FAILED  2
@@ -98,6 +99,9 @@ class IXFileHandle {
         unsigned ixWritePageCounter;
         unsigned ixAppendPageCounter;
 
+        // true if this file handle has been attached to a file
+        bool opened;
+
         FileHandle* fileHandle;
 
         // Constructor
@@ -142,7 +146,7 @@ class IX_ScanIterator {
         // Get next matching entry
         RC getNextEntry(RID &rid, void *key);
 
-        void init(IXFileHandle &ixfileHandle,
+        RC init(IXFileHandle &ixfileHandle,
                 const Attribute &attribute,
                 const void *lowKey,
                 const void *highKey,
@@ -212,11 +216,11 @@ class IndexManager {
 
         NodeType getNodeType(const void *page) const;
         int compareAttributeValues(const void *key_1, const void *key_2, const Attribute &attribute) const;
-        void findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
-        void findIndexStart(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, PageNum &pageNum);
+        RC findPageWithKey(IXFileHandle &ixfileHandle, const void *key, const  Attribute &attribute, void *page, PageNum &pageNum);
+        RC findIndexStart(IXFileHandle &ixfileHandle, const Attribute &attribute, void *page, PageNum &pageNum);
 
-        bool canEntryFitInLeafNode(LeafNode node, const void *key, const Attribute &attribute);
-        bool canEntryFitInInteriorNode(InteriorNode node, const void *key, const Attribute &attribute);
+        bool canEntryFitInLeafNode(LeafNode &node, const void *key, const Attribute &attribute);
+        bool canEntryFitInInteriorNode(InteriorNode &node, const void *key, const Attribute &attribute);
         RC addEntryToLeafNode(LeafNode &node, const void *key, RID rid, const Attribute &attribute);
         RC addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &node, const void *key, const Attribute &attribute);
         RC addEntryToRootNode(IXFileHandle &ixfileHandle, InteriorNode &node, void *key, PageNum leftChild, PageNum rightChild);
