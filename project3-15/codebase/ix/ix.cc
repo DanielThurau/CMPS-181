@@ -275,7 +275,7 @@ void IndexManager::newInteriorBasedPage(void *page, int32_t leftSibling, int32_t
 
     IndexDirectory indexDirectory;
     indexDirectory.numEntries = 0;
-    indexDirectory.freeSpaceOffset = sizeof(IndexDirectory);
+    indexDirectory.freeSpaceOffset = sizeof(IndexDirectory) + sizeof(FamilyDirectory);
     indexDirectory.type = INTERIOR_NODE;
 
     FamilyDirectory familyDirectory;
@@ -481,23 +481,11 @@ RC IndexManager::addEntryToInteriorNode(IXFileHandle &ixfileHandle, InteriorNode
 }
 
 RC IndexManager::addEntryToRootNode(IXFileHandle &ixfileHandle, InteriorNode &node, void *key, PageNum leftChild, PageNum rightChild) {
-    uint32_t key_size;
-    switch(node.attribute.type) {
-    case TypeInt:
-    case TypeReal:
-        key_size = node.attribute.length;
-        break;
-    case TypeVarChar:
-        uint32_t varchar_length;
-        memcpy(&varchar_length, key, VARCHAR_LENGTH_SIZE);
-        key_size = varchar_length + VARCHAR_LENGTH_SIZE;
-        break;
-    }
     node.trafficCops.push_back(key);
     node.pagePointers.push_back(leftChild);
     node.pagePointers.push_back(rightChild);
-    node.indexDirectory.freeSpaceOffset += key_size + 2 * sizeof(PageNum);
-    node.indexDirectory.numEntries++;
+    node.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(node);
+    node.indexDirectory.numEntries = node.trafficCops.size();
     return SUCCESS;
 }
 
@@ -577,9 +565,15 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
         // 
         }else{
 
+            if(addEntryToInteriorNode(ixfileHandle, *node, key, attribute))
+                return IN_ADD_FAILED;
+
+
             // reference to empty leafNode object that will be split into
             InteriorNode *newNode = new InteriorNode();
-            
+                
+
+
             if(splitInteriorNode(ixfileHandle, *node, *newNode, newKey))
                 return IM_SPLIT_FAILED;
 
@@ -592,7 +586,7 @@ RC IndexManager::insertAndSplit(IXFileHandle &ixfileHandle, const Attribute &att
                 newInteriorBasedPage(newPage, -1, -1, 0);
 
                 InteriorNode *newRoot = new InteriorNode(newPage, attribute, 0);
-                if(addEntryToRootNode(ixfileHandle, *newRoot, newKey, ixfileHandle.getNumberOfPages()-1, ixfileHandle.getNumberOfPages() - 2))
+                if(addEntryToRootNode(ixfileHandle, *newRoot, newKey, ixfileHandle.getNumberOfPages()-2, ixfileHandle.getNumberOfPages()-1))
                     return IN_ADD_FAILED;
 
                 newRoot->writeToPage(newPage, attribute); // needs error checking
@@ -698,9 +692,13 @@ RC IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &ori
         newNode.selfPageNum = ixfileHandle.getNumberOfPages();
     }
 
+
     newNode.familyDirectory.leftSibling = originNode.selfPageNum;
     newNode.familyDirectory.rightSibling = originNode.familyDirectory.rightSibling;
     newNode.familyDirectory.parent = originNode.familyDirectory.parent;
+
+    originNode.familyDirectory.rightSibling = newNode.selfPageNum;
+
 
     // take the subvector of the original node's keys and copy it to the new node
     vector<void*>::const_iterator firstKey = originNode.trafficCops.begin() + ceil(originNode.trafficCops.size() / 2) + 1;
@@ -718,6 +716,11 @@ RC IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &ori
     // erase split values out of original node
     originNode.pagePointers.erase(originNode.pagePointers.begin() + ceil(originNode.pagePointers.size()/2) + 1, originNode.pagePointers.begin() + originNode.pagePointers.size());
 
+    // traffic cop is first key of new node (right sibling of origin)
+    memcpy(newKey, newNode.trafficCops[0], newNode.attribute.length);
+
+    newNode.trafficCops.erase(newNode.trafficCops.begin());
+
     originNode.indexDirectory.numEntries = originNode.trafficCops.size();
     newNode.indexDirectory.numEntries = newNode.trafficCops.size();
 
@@ -725,11 +728,7 @@ RC IndexManager::splitInteriorNode(IXFileHandle &ixfileHandle, InteriorNode &ori
     originNode.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(originNode);
     newNode.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(newNode);
 
-    // traffic cop is first key of new node (right sibling of origin)
-    memcpy(newKey, newNode.trafficCops[0], newNode.attribute.length);
-
-    newNode.trafficCops.erase(newNode.trafficCops.begin());
-    newNode.pagePointers.erase(newNode.pagePointers.begin());
+    
 
     void *page = malloc(PAGE_SIZE);
 
