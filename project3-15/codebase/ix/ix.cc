@@ -642,11 +642,14 @@ RC IndexManager::splitLeafNode(IXFileHandle &ixfileHandle, LeafNode &originLeaf,
     originLeaf.rids.erase(originLeaf.rids.begin() + ceil(originLeaf.rids.size()/2) + 1, originLeaf.rids.begin() + originLeaf.rids.size());
 
     originLeaf.indexDirectory.numEntries = originLeaf.keys.size();
-    newLeaf.indexDirectory.numEntries = originLeaf.keys.size();
+    newLeaf.indexDirectory.numEntries = newLeaf.keys.size();
 
     // recalculate Free space offset (difficult if varchar)
     originLeaf.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(originLeaf);
     newLeaf.indexDirectory.freeSpaceOffset = calculateFreeSpaceOffset(newLeaf);
+
+    // set new leaf's attribute
+    newLeaf.attribute = originLeaf.attribute;
 
     void *page = malloc(PAGE_SIZE);
 
