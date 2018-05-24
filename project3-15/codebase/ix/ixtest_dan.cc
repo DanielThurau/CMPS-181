@@ -28,7 +28,7 @@ int testCase_dan(const string &indexFileName, const Attribute &attribute)
     RID rid;
     int key = 100;
 
-    for(int i = 0; i < 10; i++){
+    for(int i = 0; i < 10000; i++){
         keys.push_back(key + i);
         rid.pageNum = key;
         rid.slotNum = key+1;
