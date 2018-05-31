@@ -13,8 +13,10 @@ RelationManager* RelationManager::instance()
     return _rm;
 }
 
-RelationManager::RelationManager()
-: tableDescriptor(createTableDescriptor()), columnDescriptor(createColumnDescriptor())
+RelationManager::RelationManager():
+    tableDescriptor(createTableDescriptor()),
+    columnDescriptor(createColumnDescriptor()),
+    indexDescriptor(createIndexDescriptor())
 {
 }
 
@@ -33,6 +35,9 @@ RC RelationManager::createCatalog()
     rc = rbfm->createFile(getFileName(COLUMNS_TABLE_NAME));
     if (rc)
         return rc;
+    rc = rbfm->createFile(getFileName(INDEXES_TABLE_NAME));
+    if (rc)
+        return rc;
 
     // Add table entries for both Tables and Columns
     rc = insertTable(TABLES_TABLE_ID, 1, TABLES_TABLE_NAME);
@@ -41,13 +46,18 @@ RC RelationManager::createCatalog()
     rc = insertTable(COLUMNS_TABLE_ID, 1, COLUMNS_TABLE_NAME);
     if (rc)
         return rc;
-
+    rc = insertTable(INDEXES_TABLE_ID, 1, INDEXES_TABLE_NAME);
+    if (rc)
+        return rc;
 
     // Add entries for tables and columns to Columns table
     rc = insertColumns(TABLES_TABLE_ID, tableDescriptor);
     if (rc)
         return rc;
     rc = insertColumns(COLUMNS_TABLE_ID, columnDescriptor);
+    if (rc)
+        return rc;
+    rc = insertColumns(INDEXES_TABLE_ID, indexDescriptor);
     if (rc)
         return rc;
 
@@ -66,6 +76,10 @@ RC RelationManager::deleteCatalog()
         return rc;
 
     rc = rbfm->destroyFile(getFileName(COLUMNS_TABLE_NAME));
+    if (rc)
+        return rc;
+
+    rc = rbfm->destroyFile(getFileName(INDEXES_TABLE_NAME));
     if (rc)
         return rc;
 
@@ -493,6 +507,28 @@ vector<Attribute> RelationManager::createColumnDescriptor()
     return cd;
 }
 
+vector<Attribute> RelationManager::createIndexDescriptor() {
+    vector<Attribute> id;
+    Attribute attr;
+
+    attr.name = INDEXES_COL_TABLE_NAME;
+    attr.type = TypeVarChar;
+    attr.length = (AttrLength) INDEXES_COL_TABLE_NAME_SIZE;
+    id.push_back(attr);
+
+    attr.name = INDEXES_COL_ATTR_NAME;
+    attr.type = TypeVarChar;
+    attr.length = (AttrLength) INDEXES_COL_ATTR_NAME_SIZE;
+    id.push_back(attr);
+
+    attr.name = INDEXES_COL_INDEX_FILENAME;
+    attr.type = TypeVarChar;
+    attr.length = (AttrLength) INDEXES_COL_INDEX_FILENAME_SIZE;
+    id.push_back(attr);
+
+    return id;
+}
+
 // Creates the Tables table entry for the given id and tableName
 // Assumes fileName is just tableName + file extension
 void RelationManager::prepareTablesRecordData(int32_t id, bool system, const string &tableName, void *data)
@@ -559,6 +595,33 @@ void RelationManager::prepareColumnsRecordData(int32_t id, int32_t pos, Attribut
 
     memcpy((char*) data + offset, &pos, INT_SIZE);
     offset += INT_SIZE;
+}
+
+void RelationManager::prepareIndexRecordData(const string &table_name, const string &attr_name, const string &index_filename, void *data) {
+    unsigned offset = 0;
+    int32_t table_name_len = table_name.length();
+    int32_t attr_name_len = attr_name.length();
+    int32_t index_filename_len = index_filename.length();
+
+    // no fields will ever be null
+    char null = 0;
+
+    memcpy((char*) data + offset, &null, 1);
+    offset += 1;
+
+    memcpy((char*) data + offset, &table_name_len, VARCHAR_LENGTH_SIZE);
+    offset += VARCHAR_LENGTH_SIZE;
+    memcpy((char*) data + offset, table_name.c_str(), table_name_len);
+    offset += table_name_len;
+
+    memcpy((char*) data + offset, &attr_name_len, VARCHAR_LENGTH_SIZE);
+    offset += VARCHAR_LENGTH_SIZE;
+    memcpy((char*) data + offset, attr_name.c_str(), attr_name_len);
+    offset += attr_name_len;
+
+    memcpy((char*) data + offset, &index_filename_len, VARCHAR_LENGTH_SIZE);
+    offset += VARCHAR_LENGTH_SIZE;
+    memcpy((char*) data + offset, index_filename.c_str(), index_filename_len);
 }
 
 // Insert the given columns into the Columns table
@@ -809,6 +872,129 @@ void RelationManager::fromAPI(float &real, void *data)
     real = tmp;
 }
 
+RC RelationManager::getIndexFilename(const string &tableName, const string &attributeName, string &fileName, RID &rid) {
+    // copy table name to API format without null indicator
+    void *value = malloc(INDEXES_COL_INDEX_FILENAME_SIZE);
+    uint32_t nameLength = tableName.length();
+    memcpy(value, &nameLength, VARCHAR_LENGTH_SIZE);
+    memcpy((char*) value + VARCHAR_LENGTH_SIZE, tableName.c_str(), nameLength);
+
+    // retrieve attribute name and index filename
+    vector<string> attributes;
+    attributes.push_back(INDEXES_COL_ATTR_NAME);
+    attributes.push_back(INDEXES_COL_INDEX_FILENAME);
+
+    RM_ScanIterator scanner;
+
+    scan(INDEXES_TABLE_NAME, INDEXES_COL_TABLE_NAME, EQ_OP, value, attributes, scanner);
+
+    // read all indices for this table name
+    void *data = malloc(INDEXES_RECORD_DATA_SIZE);
+    while(scanner.getNextTuple(rid, data) != RM_EOF) {
+        // start at offset of 1 to skip null indicator
+        unsigned offset = 1;
+        // get attribute name from data
+        uint32_t attrNameLength;
+        memcpy(&attrNameLength, (char*) data + offset, VARCHAR_LENGTH_SIZE);
+        offset += VARCHAR_LENGTH_SIZE;
+        char returnedAttrName[INDEXES_COL_ATTR_NAME_SIZE];
+        memcpy(returnedAttrName, (char*) data + offset, attrNameLength);
+        offset += attrNameLength;
+        returnedAttrName[attrNameLength] = '\0';
+        // if attribute name doesn't match the one provided, continue
+        if (attributeName != string(returnedAttrName))
+            continue;
+        
+        // if attribute name does match, set fileName to be the filename from data
+        uint32_t filenameLength;
+        memcpy(&filenameLength, (char*) data + offset, VARCHAR_LENGTH_SIZE);
+        offset += VARCHAR_LENGTH_SIZE;
+        char returnedFilename[INDEXES_COL_INDEX_FILENAME_SIZE];
+        memcpy(returnedFilename, (char*) data + offset, filenameLength);
+        returnedFilename[filenameLength] = '\0';
+        fileName = string(returnedFilename);
+
+        free(value);
+        free(data);
+        return SUCCESS;
+    }
+
+    // if we get here, then no matching index was found in the catalog
+    free(value);
+    free(data);
+    return RM_NO_MATCHING_INDEX;
+}
+
+RC RelationManager::createIndex(const string &tableName, const string &attributeName)
+{
+    IndexManager *im = IndexManager::instance();
+    RC rc;
+
+    // create a file for the new index
+    string index_filename = tableName + "_" + attributeName + INDEX_FILE_EXTENSION;
+    rc = im->createFile(index_filename);
+    if (rc)
+        return rc;
+    
+    // create new entry for indexes catalog table
+    void *data = malloc(INDEXES_RECORD_DATA_SIZE);
+    prepareIndexRecordData(tableName, attributeName, index_filename, data);
+
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+
+    // open indexes catalog file
+    FileHandle fileHandle;
+    rc = rbfm->openFile(INDEXES_TABLE_NAME, fileHandle);
+    if (rc) {
+        free(data);
+        return rc;
+    }
+
+    // insert new catalog entry
+    RID rid;
+    rc = rbfm->insertRecord(fileHandle, indexDescriptor, data, rid);
+    if (rc) {
+        free(data);
+        return rc;
+    }
+    
+    free(data);
+    return SUCCESS;
+}
+
+RC RelationManager::destroyIndex(const string &tableName, const string &attributeName)
+{
+    IndexManager *im = IndexManager::instance();
+    RC rc;
+
+    string fileName;
+    RID rid;
+    rc = getIndexFilename(tableName, attributeName, fileName, rid);
+    if (rc)
+        return rc;
+
+    rc = im->destroyFile(fileName);
+    if (rc)
+        return rc;
+    
+    rc = deleteTuple(INDEXES_TABLE_NAME, rid);
+    if (rc)
+        return rc;
+    
+    return SUCCESS;
+}
+
+RC RelationManager::indexScan(const string &tableName,
+                      const string &attributeName,
+                      const void *lowKey,
+                      const void *highKey,
+                      bool lowKeyInclusive,
+                      bool highKeyInclusive,
+                      RM_IndexScanIterator &rm_IndexScanIterator)
+{
+	return -1;
+}
+
 // RM_ScanIterator ///////////////
 
 // Makes use of underlying rbfm_scaniterator
@@ -854,26 +1040,3 @@ RC RM_ScanIterator::close()
     rbfm->closeFile(fileHandle);
     return SUCCESS;
 }
-
-RC RelationManager::createIndex(const string &tableName, const string &attributeName)
-{
-	return -1;
-}
-
-RC RelationManager::destroyIndex(const string &tableName, const string &attributeName)
-{
-	return -1;
-}
-
-RC RelationManager::indexScan(const string &tableName,
-                      const string &attributeName,
-                      const void *lowKey,
-                      const void *highKey,
-                      bool lowKeyInclusive,
-                      bool highKeyInclusive,
-                      RM_IndexScanIterator &rm_IndexScanIterator)
-{
-	return -1;
-}
-
-

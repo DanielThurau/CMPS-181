@@ -11,6 +11,7 @@
 using namespace std;
 
 #define TABLE_FILE_EXTENSION ".t"
+#define INDEX_FILE_EXTENSION ".ix"
 
 #define TABLES_TABLE_NAME           "Tables"
 #define TABLES_TABLE_ID             1
@@ -42,10 +43,24 @@ using namespace std;
 // 1 null byte, 4 integer fields and a varchar
 #define COLUMNS_RECORD_DATA_SIZE 1 + 5 * INT_SIZE + COLUMNS_COL_COLUMN_NAME_SIZE
 
+#define INDEXES_TABLE_NAME           "Indexes"
+#define INDEXES_TABLE_ID             3
+
+#define INDEXES_COL_TABLE_NAME       "table-name"
+#define INDEXES_COL_ATTR_NAME        "attr-name"
+#define INDEXES_COL_INDEX_FILENAME   "index-filename"
+#define INDEXES_COL_TABLE_NAME_SIZE  50
+#define INDEXES_COL_ATTR_NAME_SIZE   50
+#define INDEXES_COL_INDEX_FILENAME_SIZE 50
+
+// 3 varchars
+#define INDEXES_RECORD_DATA_SIZE 1 + INDEXES_COL_TABLE_NAME_SIZE + INDEXES_COL_ATTR_NAME_SIZE + INDEXES_COL_INDEX_FILENAME_SIZE
+
 # define RM_EOF (-1)  // end of a scan operator
 
 #define RM_CANNOT_MOD_SYS_TBL 1
 #define RM_NULL_COLUMN        2
+#define RM_NO_MATCHING_INDEX  3
 
 typedef struct IndexedAttr
 {
@@ -140,6 +155,7 @@ private:
   static RelationManager *_rm;
   const vector<Attribute> tableDescriptor;
   const vector<Attribute> columnDescriptor;
+  const vector<Attribute> indexDescriptor;
 
   // Convert tableName to file name (append extension)
   static string getFileName(const char *tableName);
@@ -148,10 +164,12 @@ private:
   // Create recordDescriptor for Table/Column tables
   static vector<Attribute> createTableDescriptor();
   static vector<Attribute> createColumnDescriptor();
+  static vector<Attribute> createIndexDescriptor();
 
   // Prepare an entry for the Table/Column table
   void prepareTablesRecordData(int32_t id, bool system, const string &tableName, void *data);
   void prepareColumnsRecordData(int32_t id, int32_t pos, Attribute attr, void *data);
+  void prepareIndexRecordData(const string &table_name, const string &attr_name, const string &index_filename, void *data);
 
   // Given a table ID and recordDescriptor, creates entries in Column table
   RC insertColumns(int32_t id, const vector<Attribute> &recordDescriptor);
@@ -165,7 +183,7 @@ private:
 
   RC isSystemTable(bool &system, const string &tableName);
 
-
+  RC getIndexFilename(const string &tableName, const string &attributeName, string &fileName, RID &rid);
 
   // Utility functions for converting single values to/from api format
   // Useful when using ScanIterators
