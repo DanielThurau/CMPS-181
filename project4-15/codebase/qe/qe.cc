@@ -16,7 +16,7 @@ RC Filter::getNextTuple(void *data)
 
 void Filter::getAttributes(vector<Attribute> &attrs) const
 {
-	return;
+
 }
 
 Project::Project(Iterator *input, const vector<string> &attrNames)
@@ -32,9 +32,8 @@ RC Project::getNextTuple(void *data)
 	return QE_EOF;
 }
 
-void getAttributes(vector<Attribute> &attrs) const
+void Project::getAttributes(vector<Attribute> &attrs) const
 {
-	return;
 }
 
 INLJoin::INLJoin(Iterator *leftIn,
@@ -54,5 +53,4 @@ RC INLJoin::getNextTuple(void *data)
 
 void INLJoin::getAttributes(vector<Attribute> &attrs) const
 {
-	return;
 }
