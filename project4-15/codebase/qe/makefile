@@ -1,7 +1,7 @@
 
 include ../makefile.inc
 
-all: libqe.a qetest_01 qetest_02 qetest_03 qetest_04 qetest_05 qetest_06 qetest_09 qetest_10
+all: libqe.a qetest_01 qetest_02 qetest_03 qetest_04 qetest_05 qetest_06 qetest_09 qetest_10 qetest_dan
 
 # lib file dependencies
 libqe.a: libqe.a(qe.o)  # and possibly other .o files
@@ -20,7 +20,7 @@ qetest_05: qetest_05.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(C
 qetest_06: qetest_06.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(CODEROOT)/rbf/librbf.a
 qetest_09: qetest_09.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(CODEROOT)/rbf/librbf.a
 qetest_10: qetest_10.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(CODEROOT)/rbf/librbf.a
-
+qetest_dan: qetest_dan.o libqe.a $(CODEROOT)/ix/libix.a $(CODEROOT)/rm/librm.a $(CODEROOT)/rbf/librbf.a
 
 # dependencies to compile used libraries
 .PHONY: $(CODEROOT)/rbf/librbf.a
@@ -38,5 +38,6 @@ $(CODEROOT)/ix/libix.a:
 .PHONY: clean
 clean:
 	-rm qetest_01 qetest_02 qetest_03 qetest_04 qetest_05 qetest_06 qetest_09 qetest_10 *.a *.o *~ Tables* Columns* left* right* large*
+	-rm qestest_dan
 	$(MAKE) -C $(CODEROOT)/rm clean
 	$(MAKE) -C $(CODEROOT)/ix clean 
