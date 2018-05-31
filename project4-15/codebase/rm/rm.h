@@ -61,6 +61,7 @@ using namespace std;
 #define RM_CANNOT_MOD_SYS_TBL 1
 #define RM_NULL_COLUMN        2
 #define RM_NO_MATCHING_INDEX  3
+#define RM_ATTR_NOT_FOUND     4
 
 typedef struct IndexedAttr
 {
@@ -184,6 +185,7 @@ private:
   RC isSystemTable(bool &system, const string &tableName);
 
   RC getIndexFilename(const string &tableName, const string &attributeName, string &fileName, RID &rid);
+  RC updateIndexes(const string &tableName, const void *data, const RID &rid);
 
   // Utility functions for converting single values to/from api format
   // Useful when using ScanIterators

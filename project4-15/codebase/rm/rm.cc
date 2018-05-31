@@ -126,6 +126,14 @@ RC RelationManager::deleteTable(const string &tableName)
         return rc;
     if (isSystem)
         return RM_CANNOT_MOD_SYS_TBL;
+    
+    // destroy indices for this table
+    // just try to destroy every possible index attribute
+    vector<Attribute> attributes;
+    getAttributes(tableName, attributes);
+    for (Attribute attr: attributes) {
+        destroyIndex(tableName, attr.name);
+    }
 
     // Delete the rbfm file holding this table's entries
     rc = rbfm->destroyFile(getFileName(tableName));
@@ -318,6 +326,8 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
     // Let rbfm do all the work
     rc = rbfm->insertRecord(fileHandle, recordDescriptor, data, rid);
     rbfm->closeFile(fileHandle);
+
+    rc = updateIndexes(tableName, data, rid);
 
     return rc;
 }
@@ -872,6 +882,73 @@ void RelationManager::fromAPI(float &real, void *data)
     real = tmp;
 }
 
+RC RelationManager::updateIndexes(const string &tableName, const void *data, const RID &rid) {
+    RM_ScanIterator scanner;
+    IndexManager *im = IndexManager::instance();
+
+    // turn tableName into API format
+    void *value = malloc(INDEXES_COL_TABLE_NAME_SIZE);
+    uint32_t tableNameLength = tableName.length();
+    memcpy(value, &tableNameLength, VARCHAR_LENGTH_SIZE);
+    memcpy((char*) value + VARCHAR_LENGTH_SIZE, tableName.c_str(), tableNameLength);
+
+    // get attributes for this table
+    vector<Attribute> tableAttrs;
+    getAttributes(tableName, tableAttrs);
+
+    // just need attribute name and filename
+    vector<string> projection;
+    projection.push_back(INDEXES_COL_ATTR_NAME);
+    projection.push_back(INDEXES_COL_INDEX_FILENAME);
+
+    // scan
+    scan(INDEXES_TABLE_NAME, INDEXES_COL_TABLE_NAME, EQ_OP, value, projection, scanner);
+
+    RID indexRID;
+    void *returnedData = malloc(INDEXES_RECORD_DATA_SIZE);
+    while (scanner.getNextTuple(indexRID, returnedData) != RM_EOF) {
+        // start at offset of 1 to skip null indicator
+        unsigned offset = 1;
+
+        // get attribute name from data
+        uint32_t attrNameLength;
+        memcpy(&attrNameLength, (char*) data + offset, VARCHAR_LENGTH_SIZE);
+        offset += VARCHAR_LENGTH_SIZE;
+        char tmp_attr[INDEXES_COL_ATTR_NAME_SIZE];
+        memcpy(tmp_attr, (char*) data + offset, attrNameLength);
+        offset += attrNameLength;
+        tmp_attr[attrNameLength] = '\0';
+        string attrName = string(tmp_attr);
+
+        // get filename from data
+        uint32_t filenameLength;
+        memcpy(&filenameLength, (char*) data + offset, VARCHAR_LENGTH_SIZE);
+        offset += VARCHAR_LENGTH_SIZE;
+        char tmp_filename[INDEXES_COL_INDEX_FILENAME_SIZE];
+        memcpy(tmp_filename, (char*) data + offset, filenameLength);
+        tmp_filename[filenameLength] = '\0';
+        string fileName = string(tmp_filename);
+
+        // get attribute matching attribute name from vector of attributes for this table
+        auto pred = [&](Attribute a) { return a.name == attrName; };
+        vector<Attribute>::iterator attr = find_if(tableAttrs.begin(), tableAttrs.end(), pred);
+        if (attr == tableAttrs.end()) {
+            return RM_ATTR_NOT_FOUND;
+        }
+
+        // open index file and insert
+        IXFileHandle ixFileHandle;
+        im->openFile(fileName, ixFileHandle);
+        im->insertEntry(ixFileHandle, *attr, data, rid);
+        im->closeFile(ixFileHandle);
+    }
+
+    free(value);
+    free(returnedData);
+    scanner.close();
+    return SUCCESS;
+}
+
 RC RelationManager::getIndexFilename(const string &tableName, const string &attributeName, string &fileName, RID &rid) {
     // copy table name to API format without null indicator
     void *value = malloc(INDEXES_COL_INDEX_FILENAME_SIZE);
@@ -880,13 +957,13 @@ RC RelationManager::getIndexFilename(const string &tableName, const string &attr
     memcpy((char*) value + VARCHAR_LENGTH_SIZE, tableName.c_str(), nameLength);
 
     // retrieve attribute name and index filename
-    vector<string> attributes;
-    attributes.push_back(INDEXES_COL_ATTR_NAME);
-    attributes.push_back(INDEXES_COL_INDEX_FILENAME);
+    vector<string> projection;
+    projection.push_back(INDEXES_COL_ATTR_NAME);
+    projection.push_back(INDEXES_COL_INDEX_FILENAME);
 
     RM_ScanIterator scanner;
 
-    scan(INDEXES_TABLE_NAME, INDEXES_COL_TABLE_NAME, EQ_OP, value, attributes, scanner);
+    scan(INDEXES_TABLE_NAME, INDEXES_COL_TABLE_NAME, EQ_OP, value, projection, scanner);
 
     // read all indices for this table name
     void *data = malloc(INDEXES_RECORD_DATA_SIZE);
@@ -916,12 +993,14 @@ RC RelationManager::getIndexFilename(const string &tableName, const string &attr
 
         free(value);
         free(data);
+        scanner.close();
         return SUCCESS;
     }
 
     // if we get here, then no matching index was found in the catalog
     free(value);
     free(data);
+    scanner.close();
     return RM_NO_MATCHING_INDEX;
 }
 
