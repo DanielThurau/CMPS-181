@@ -1091,17 +1091,6 @@ RC RelationManager::destroyIndex(const string &tableName, const string &attribut
     return SUCCESS;
 }
 
-RC RelationManager::indexScan(const string &tableName,
-                      const string &attributeName,
-                      const void *lowKey,
-                      const void *highKey,
-                      bool lowKeyInclusive,
-                      bool highKeyInclusive,
-                      RM_IndexScanIterator &rm_IndexScanIterator)
-{
-	return -1;
-}
-
 // RM_ScanIterator ///////////////
 
 // Makes use of underlying rbfm_scaniterator
@@ -1145,5 +1134,55 @@ RC RM_ScanIterator::close()
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
     rbfm_iter.close();
     rbfm->closeFile(fileHandle);
+    return SUCCESS;
+}
+
+RC RelationManager::indexScan(const string &tableName,
+                      const string &attributeName,
+                      const void *lowKey,
+                      const void *highKey,
+                      bool lowKeyInclusive,
+                      bool highKeyInclusive,
+                      RM_IndexScanIterator &rm_IndexScanIterator)
+{
+    IndexManager *im = IndexManager::instance();
+    RC rc;
+
+    rc = im->openFile(getFileName(tableName), rm_IndexScanIterator.ixfileHandle);
+    if (rc)
+        return rc;
+    
+    // get attribute for this record with the given attribute name
+    vector<Attribute> recordDescriptor;
+    rc = getAttributes(tableName, recordDescriptor);
+    auto pred = [&](Attribute a) { return a.name == attributeName; };
+    vector<Attribute>::iterator attr = find_if(recordDescriptor.begin(), recordDescriptor.end(), pred);
+    if (attr == recordDescriptor.end())
+        return RM_ATTR_NOT_FOUND;
+    
+    rc = im->scan(rm_IndexScanIterator.ixfileHandle, *attr, lowKey, highKey,
+                  lowKeyInclusive, highKeyInclusive, rm_IndexScanIterator.ix_scanIterator);
+    if (rc)
+        return rc;
+    
+    return SUCCESS;
+}
+
+RM_IndexScanIterator::RM_IndexScanIterator() {
+
+}
+
+RM_IndexScanIterator::~RM_IndexScanIterator() {
+
+}
+
+RC RM_IndexScanIterator::getNextEntry(RID &rid, void *key) {
+    return ix_scanIterator.getNextEntry(rid, key);
+}
+
+RC RM_IndexScanIterator::close() {
+    IndexManager *im = IndexManager::instance();
+    ix_scanIterator.close();
+    im->closeFile(ixfileHandle);
     return SUCCESS;
 }
