@@ -1,5 +1,6 @@
 
 #include "qe.h"
+#include <string>
 
 Filter::Filter(Iterator* input, const Condition &condition)
 {
@@ -41,6 +42,15 @@ INLJoin::INLJoin(Iterator *leftIn,
 	  IndexScan *rightIn,
 	  const Condition &condition)
 {
+	// Verify that the condition contains two attributes (it is a JOIN).
+//	if(!(*condition).bRhsIsAttr);
+
+	// Check if right attribute matches condition.
+//	if(!rightIn.attrName.strcmp(*condition.rhsAttr));
+
+	// Check that attributes are comparable.
+//	if((*condition).rhsValue.type != (*condition).lhsValue.type);
+
 }
 
 INLJoin::~INLJoin()
