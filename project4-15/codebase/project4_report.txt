@@ -1,11 +1,11 @@
 1. Basic information
-Team number (e.g., 01) : 
+Team number (e.g., 01) : 15
 #1 Student ID : 
-#1 Student Name : 
+#1 Student Name : Morgan Grant
 #2 Student ID : 
-#2 Student Name : 
-#3 Student ID : 
-#3 Student Name : 
+#2 Student Name : Daniel Thurau
+#3 Student ID : 1411983
+#3 Student Name : Preston Fraser
 
 
 2. Catalog information about Index
