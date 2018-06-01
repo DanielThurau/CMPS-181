@@ -184,8 +184,12 @@ private:
 
   RC isSystemTable(bool &system, const string &tableName);
 
+  // get filename and rid for an index given table name and attribute name
   RC getIndexFilename(const string &tableName, const string &attributeName, string &fileName, RID &rid);
+  // update all indexes for the given table
   RC updateIndexes(const string &tableName, const void *data, const RID &rid);
+  // get the index'th attribute from a tuple
+  void getAttrFromTuple(const vector<Attribute> attrs, int index, const void *tuple, void *&data);
 
   // Utility functions for converting single values to/from api format
   // Useful when using ScanIterators

@@ -25,5 +25,8 @@ ixtest_14
 ixtest_15
 ixtest_dan
 
+*.t
+
 # Dans run script
 run.sh
+
