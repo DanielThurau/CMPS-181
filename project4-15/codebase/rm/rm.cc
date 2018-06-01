@@ -882,6 +882,27 @@ void RelationManager::fromAPI(float &real, void *data)
     real = tmp;
 }
 
+void RelationManager::getAttrFromTuple(const vector<Attribute> attrs, int index, const void *tuple, void *&data) {
+    // set data to point to first attr in tuple
+    // skip null bytes
+    int nullIndicatorSize = int(ceil((double) attrs.size() / CHAR_BIT));
+    data = (char*) tuple + nullIndicatorSize;
+    // advance data through fields until we reach index
+    for (int i = 0; i < index; i++) {
+        switch (attrs[i].type) {
+        case TypeInt:
+        case TypeReal:
+            data = (char*) data + attrs[i].length; 
+            break;
+        case TypeVarChar:
+            uint32_t varchar_length;
+            memcpy(&varchar_length, data, VARCHAR_LENGTH_SIZE);
+            data = (char*) data + VARCHAR_LENGTH_SIZE + varchar_length;
+            break;
+        }
+    }
+}
+
 RC RelationManager::updateIndexes(const string &tableName, const void *data, const RID &rid) {
     RM_ScanIterator scanner;
     IndexManager *im = IndexManager::instance();
@@ -912,20 +933,20 @@ RC RelationManager::updateIndexes(const string &tableName, const void *data, con
 
         // get attribute name from data
         uint32_t attrNameLength;
-        memcpy(&attrNameLength, (char*) data + offset, VARCHAR_LENGTH_SIZE);
+        memcpy(&attrNameLength, (char*) returnedData + offset, VARCHAR_LENGTH_SIZE);
         offset += VARCHAR_LENGTH_SIZE;
         char tmp_attr[INDEXES_COL_ATTR_NAME_SIZE];
-        memcpy(tmp_attr, (char*) data + offset, attrNameLength);
+        memcpy(tmp_attr, (char*) returnedData + offset, attrNameLength);
         offset += attrNameLength;
         tmp_attr[attrNameLength] = '\0';
         string attrName = string(tmp_attr);
 
-        // get filename from data
+        // get filename from returned data
         uint32_t filenameLength;
-        memcpy(&filenameLength, (char*) data + offset, VARCHAR_LENGTH_SIZE);
+        memcpy(&filenameLength, (char*) returnedData + offset, VARCHAR_LENGTH_SIZE);
         offset += VARCHAR_LENGTH_SIZE;
         char tmp_filename[INDEXES_COL_INDEX_FILENAME_SIZE];
-        memcpy(tmp_filename, (char*) data + offset, filenameLength);
+        memcpy(tmp_filename, (char*) returnedData + offset, filenameLength);
         tmp_filename[filenameLength] = '\0';
         string fileName = string(tmp_filename);
 
@@ -933,13 +954,20 @@ RC RelationManager::updateIndexes(const string &tableName, const void *data, con
         auto pred = [&](Attribute a) { return a.name == attrName; };
         vector<Attribute>::iterator attr = find_if(tableAttrs.begin(), tableAttrs.end(), pred);
         if (attr == tableAttrs.end()) {
+            free(value);
+            free(returnedData);
+            scanner.close();
             return RM_ATTR_NOT_FOUND;
         }
+
+        // extract just the attribute we want from tuple
+        void *key;
+        getAttrFromTuple(tableAttrs, attr - tableAttrs.begin(), data, key);
 
         // open index file and insert
         IXFileHandle ixFileHandle;
         im->openFile(fileName, ixFileHandle);
-        im->insertEntry(ixFileHandle, *attr, data, rid);
+        im->insertEntry(ixFileHandle, *attr, key, rid);
         im->closeFile(ixFileHandle);
     }
 
@@ -1023,7 +1051,7 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
 
     // open indexes catalog file
     FileHandle fileHandle;
-    rc = rbfm->openFile(INDEXES_TABLE_NAME, fileHandle);
+    rc = rbfm->openFile(getFileName(INDEXES_TABLE_NAME), fileHandle);
     if (rc) {
         free(data);
         return rc;
