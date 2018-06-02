@@ -39,6 +39,11 @@ class Iterator {
         virtual RC getNextTuple(void *data) = 0;
         virtual void getAttributes(vector<Attribute> &attrs) const = 0;
         virtual ~Iterator() {};
+    
+    protected:
+        bool fieldIsNull(void *data, int i);
+        void setFieldNull(void *data, int i);
+        unsigned getNumNullBytes(unsigned numAttributes);
 };
 
 
@@ -211,9 +216,17 @@ class Project : public Iterator {
               const vector<string> &attrNames);   // vector containing attribute names
         ~Project();
 
-        RC getNextTuple(void *data) {};
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
         void getAttributes(vector<Attribute> &attrs) const;
+    
+    private:
+        Iterator *input;
+        vector<string> attrNames;
+        vector<Attribute> inputAttrs;
+        unsigned inputTupleSize;
+
+        RC projectAttributes(void *origData, void *data);
 };
 
 
