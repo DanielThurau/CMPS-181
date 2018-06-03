@@ -1064,6 +1064,35 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
         free(data);
         return rc;
     }
+
+    // scan this table and add all its entries to this new index
+    RM_ScanIterator scanner;
+    vector<string> projectionAttributes;
+    projectionAttributes.push_back(attributeName);
+
+    // get attribute for this attribute of this table
+    vector<Attribute> recordDescriptor;
+    getAttributes(tableName, recordDescriptor);
+    auto pred = [&](Attribute a) { return a.name == attributeName; };
+    vector<Attribute>::iterator attr = find_if(recordDescriptor.begin(), recordDescriptor.end(), pred);
+
+    rc = scan(tableName, "", NO_OP, NULL, projectionAttributes, scanner);
+    if (rc)
+        return rc;
+    
+    // alloc a buffer big enough for the attribute + null indicator
+    void *key = malloc(attr->length + 1);
+
+    IXFileHandle ixfileHandle;
+    im->openFile(index_filename, ixfileHandle);
+    while (scanner.getNextTuple(rid, key) != RM_EOF) {
+        // insert each entry into the index
+        // use key + 1 to skip null indicator
+        im->insertEntry(ixfileHandle, *attr, (char *) key + 1, rid);
+    }
+    im->closeFile(ixfileHandle);
+
+    scanner.close();
     
     free(data);
     return SUCCESS;
