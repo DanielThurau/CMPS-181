@@ -71,9 +71,10 @@ Project::~Project()
 RC Project::getNextTuple(void *data)
 {
 	void *origData = malloc(inputTupleSize);
-	while (input->getNextTuple(origData) != QE_EOF) {
+	if (input->getNextTuple(origData) != QE_EOF) {
 		if(projectAttributes(origData, data))
 			return QE_EOF;
+		return SUCCESS;
 	}
 	return QE_EOF;
 }
@@ -142,30 +143,27 @@ INLJoin::INLJoin(Iterator *leftIn,
 	  IndexScan *rightIn,
 	  const Condition &condition)
 {
-	// Verify that the condition contains two attributes (it is a JOIN).
-//	if(!(*condition)->bRhsIsAttr);
+	// // Verify that the condition contains two attributes (it is a JOIN).
+	// //if(!condition.bRhsIsAttr);
 
-	// Check if right attribute matches condition.
-//	if(!strcmp(rightIn->attrName, (*condition)->rhsAttr));
+	// // Check if right attribute matches condition.
+	// if(rightIn->attrName == condition.rhsAttr);
 
-	// Check that attributes are comparable.
-//	if(condition->rhsValue->type != condition->lhsValue->type);
+	// this->leftIn = leftIn;
+	// this->rightIn = rightIn;
+	// leftIn->getAttributes(leftAttrs);
+	// this->cond = cond;
+	// inputTupleSize = 0;
+	// for(Attribute attr: leftAttrs) {
+	// 	inputTupleSize += attr.length;
+	// }
 
-	this->leftIn = leftIn;
-	this->rightIn = rightIn;
-	leftIn->getAttributes(leftAttrs);
-	this->cond = cond;
-	inputTupleSize = 0;
-	for(Attribute attr: leftAttrs) {
-		inputTupleSize += attr.length;
-	}
+	// // Check if all attributes are the same.
+	// for(int i = 0; i < leftAttrs.size() || i < rightIn->attrs.size(); i++){
 
-	// Check if all attributes are the same.
-	for(int i = 0; i < leftAttrs.size() || i < rightIn->attrs.size(); i++){
-
-		if(strcmp(leftAttrs[i], rightIn->attrs[i]))
-			continue;
-	}
+	// 	if(strcmp(leftAttrs[i], rightIn->attrs[i]))
+	// 		continue;
+	// }
 }
 
 INLJoin::~INLJoin()
