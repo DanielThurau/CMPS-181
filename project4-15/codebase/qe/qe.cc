@@ -1,6 +1,6 @@
 
 #include "qe.h"
-#include <string.h>
+#include "string.h"
 #include <algorithm>
 
 bool Iterator::fieldIsNull(void *data, int i) {
@@ -95,14 +95,29 @@ INLJoin::INLJoin(Iterator *leftIn,
 	  const Condition &condition)
 {
 	// Verify that the condition contains two attributes (it is a JOIN).
-//	if(!(*condition).bRhsIsAttr);
+//	if(!(*condition)->bRhsIsAttr);
 
 	// Check if right attribute matches condition.
-//	if(!rightIn.attrName.strcmp(*condition.rhsAttr));
+//	if(!strcmp(rightIn->attrName, (*condition)->rhsAttr));
 
 	// Check that attributes are comparable.
-//	if((*condition).rhsValue.type != (*condition).lhsValue.type);
+//	if(condition->rhsValue->type != condition->lhsValue->type);
 
+	this->leftIn = leftIn;
+	this->rightIn = rightIn;
+	leftIn->getAttributes(leftAttrs);
+	this->cond = cond;
+	inputTupleSize = 0;
+	for(Attribute attr: leftAttrs) {
+		inputTupleSize += attr.length;
+	}
+
+	// Check if all attributes are the same.
+	for(int i = 0; i < leftAttrs.size() || i < rightIn->attrs.size(); i++){
+
+		if(strcmp(leftAttrs[i], rightIn->attrs[i]))
+			continue;
+	}
 }
 
 INLJoin::~INLJoin()
