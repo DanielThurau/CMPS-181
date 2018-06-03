@@ -9,6 +9,8 @@
 
 #define QE_EOF (-1)  // end of the index scan
 
+#define QE_ATTR_NOT_FOUND 1
+
 using namespace std;
 
 typedef enum{ MIN=0, MAX, COUNT, SUM, AVG } AggregateOp;
@@ -44,6 +46,7 @@ class Iterator {
         bool fieldIsNull(void *data, int i);
         void setFieldNull(void *data, int i);
         unsigned getNumNullBytes(unsigned numAttributes);
+        unsigned getFieldLength(void *field, Attribute &attr);
 };
 
 
@@ -226,7 +229,7 @@ class Project : public Iterator {
         vector<Attribute> inputAttrs;
         unsigned inputTupleSize;
 
-        RC projectAttributes(void *origData, void *data);
+        RC projectAttributes(void *origData, void *newData);
 };
 
 
