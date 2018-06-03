@@ -245,6 +245,14 @@ class INLJoin : public Iterator {
         RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
         void getAttributes(vector<Attribute> &attrs) const;
+
+    private:
+        Iterator *leftIn;
+        IndexScan *rightIn;
+        vector<Attribute> leftAttrs;
+        // Right Attributes: rightIn->attrs
+        Condition cond;
+        unsigned inputTupleSize;
 };
 
 
