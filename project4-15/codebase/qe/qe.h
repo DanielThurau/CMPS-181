@@ -247,6 +247,7 @@ class INLJoin : public Iterator {
         Iterator *leftIn;
         IndexScan *rightIn;
         vector<Attribute> leftAttrs;
+        vector<Attribute> rightAttrs;
         // Right Attributes: rightIn->attrs
         Condition cond;
         unsigned inputTupleSize;

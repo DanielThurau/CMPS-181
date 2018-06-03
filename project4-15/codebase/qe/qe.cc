@@ -106,7 +106,8 @@ INLJoin::INLJoin(Iterator *leftIn,
 	this->leftIn = leftIn;
 	this->rightIn = rightIn;
 	leftIn->getAttributes(leftAttrs);
-	this->cond = cond;
+	rightIn->getAttributes(rightAttrs);
+	this->cond = condition;
 	inputTupleSize = 0;
 	for(Attribute attr: leftAttrs) {
 		inputTupleSize += attr.length;
@@ -115,7 +116,7 @@ INLJoin::INLJoin(Iterator *leftIn,
 	// Check if all attributes are the same.
 	for(int i = 0; i < leftAttrs.size() || i < rightIn->attrs.size(); i++){
 
-		if(strcmp(leftAttrs[i], rightIn->attrs[i]))
+		if(leftAttrs[i].name == rightIn->attrs[i].name)
 			continue;
 	}
 }
@@ -126,9 +127,15 @@ INLJoin::~INLJoin()
 
 RC INLJoin::getNextTuple(void *data)
 {
+
 	return QE_EOF;
 }
 
 void INLJoin::getAttributes(vector<Attribute> &attrs) const
 {
+	// Setting attrs to all attributes represented in inner and outer tables.
+	attrs.clear();
+	attrs = this->leftAttrs;
+	attrs.insert(attrs.end(), (rightIn->attrs).begin(), (rightIn->attrs).end());
+
 }
