@@ -250,9 +250,11 @@ class INLJoin : public Iterator {
         Iterator *leftIn;
         IndexScan *rightIn;
         vector<Attribute> leftAttrs;
-        // Right Attributes: rightIn->attrs
+        vector<Attribute> rightAttrs;
         Condition cond;
         unsigned inputTupleSize;
+
+        RC join(void *origData, void *newData);
 };
 
 

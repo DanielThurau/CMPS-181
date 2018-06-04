@@ -143,27 +143,28 @@ INLJoin::INLJoin(Iterator *leftIn,
 	  IndexScan *rightIn,
 	  const Condition &condition)
 {
-	// // Verify that the condition contains two attributes (it is a JOIN).
-	// //if(!condition.bRhsIsAttr);
+	// Verify that the condition contains two attributes (it is a JOIN).
+	if(!condition.bRhsIsAttr);
 
-	// // Check if right attribute matches condition.
-	// if(rightIn->attrName == condition.rhsAttr);
+	// Check if right attribute matches condition.
+	if(rightIn->attrName == condition.rhsAttr);
 
-	// this->leftIn = leftIn;
-	// this->rightIn = rightIn;
-	// leftIn->getAttributes(leftAttrs);
-	// this->cond = cond;
-	// inputTupleSize = 0;
-	// for(Attribute attr: leftAttrs) {
-	// 	inputTupleSize += attr.length;
-	// }
+	this->leftIn = leftIn;
+	this->rightIn = rightIn;
+	leftIn->getAttributes(leftAttrs);
+	rightIn->getAttributes(rightAttrs);
+	this->cond = condition;
+	inputTupleSize = 0;
 
-	// // Check if all attributes are the same.
-	// for(int i = 0; i < leftAttrs.size() || i < rightIn->attrs.size(); i++){
+	for(Attribute attr: leftAttrs) {
+		inputTupleSize += attr.length;
+	}
 
-	// 	if(strcmp(leftAttrs[i], rightIn->attrs[i]))
-	// 		continue;
-	// }
+	// Check if all attributes are the same.
+	for(int i = 0; i < leftAttrs.size() || i < rightIn->attrs.size(); i++){
+		if(leftAttrs[i].name == rightIn->attrs[i].name)
+			continue;
+	}
 }
 
 INLJoin::~INLJoin()
@@ -172,9 +173,36 @@ INLJoin::~INLJoin()
 
 RC INLJoin::getNextTuple(void *data)
 {
-	return QE_EOF;
+	void *origData = malloc(inputTupleSize);
+	IndexScan *riCopy = rightIn;
+
+	if(leftIn->getNextTuple(origData) != QE_EOF) {
+
+		// If we are not one checking every tuple in the rightIn,
+		// we continue scanning through that.
+		if(rightIn->getNextTuple(origData) != QE_EOF)
+
+			if(join(origData, data))
+				return QE_EOF;
+
+		// Otherwise, we reset rightIn for the next tuple to be
+		// scanned.
+		riCopy = new IndexScan(rightIn->rm, rightIn->tableName,
+									rightIn->attrName);
+	}
+	return SUCCESS;
+}
+
+RC INLJoin::join(void *origData, void *newData){
+
+	return SUCCESS;
 }
 
 void INLJoin::getAttributes(vector<Attribute> &attrs) const
 {
+	// Setting attrs to all attributes represented in inner and outer tables.
+	attrs.clear();
+	attrs = this->leftAttrs;
+	attrs.insert(attrs.end(), (rightIn->attrs).begin(), (rightIn->attrs).end());
+
 }
