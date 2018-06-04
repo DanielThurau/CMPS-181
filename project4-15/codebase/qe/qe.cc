@@ -252,11 +252,19 @@ INLJoin::INLJoin(Iterator *leftIn,
 		inputTupleSize += attr.length;
 	}
 
-	// Check if all attributes are the same.
-	for(int i = 0; i < leftAttrs.size() || i < rightIn->attrs.size(); i++){
-		if(leftAttrs[i].name == rightIn->attrs[i].name)
-			continue;
-	}
+	// Check if all attributes are the same. If so, they're the same table,
+	// and we want to rename the inner one to clarify which is which.
+	bool same = true;
+	if(leftAttrs.size() == rightAttrs.size()){
+
+		for(unsigned i = 0; i < leftAttrs.size(); i++){
+			if(leftAttrs[i].name != rightAttrs[i].name){
+				same = false;
+				break;
+			}
+		}
+	} else same = false;
+	if(same) rightIn->tableName += "2";
 }
 
 INLJoin::~INLJoin()
