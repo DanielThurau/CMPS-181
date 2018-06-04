@@ -2,6 +2,8 @@
 #define _qe_h_
 
 #include <vector>
+#include <algorithm>
+#include <cmath>
 
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
@@ -209,6 +211,17 @@ class Filter : public Iterator {
         RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
         void getAttributes(vector<Attribute> &attrs) const;
+
+    private:
+        Iterator *input;
+        vector<string> attrNames;
+        vector<Attribute> inputAttrs;
+        Condition cond;
+        unsigned inputTupleSize;
+
+        bool filterData(int recordInt, CompOp compOp, const void *value);
+        bool filterData(float recordReal, CompOp compOp, const void *value);
+        bool filterData(void *recordString, CompOp compOp, const void *value);
 };
 
 
@@ -230,6 +243,8 @@ class Project : public Iterator {
         unsigned inputTupleSize;
 
         RC projectAttributes(void *origData, void *newData);
+
+
 };
 
 

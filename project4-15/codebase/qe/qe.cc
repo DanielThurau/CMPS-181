@@ -1,7 +1,6 @@
 
 #include "qe.h"
 #include "string.h"
-#include <algorithm>
 
 bool Iterator::fieldIsNull(void *data, int i) {
 	uint8_t nullByte = ((uint8_t *) data)[i / 8];
@@ -36,7 +35,19 @@ unsigned Iterator::getFieldLength(void *field, Attribute &attr) {
 
 Filter::Filter(Iterator* input, const Condition &condition)
 {
-	
+	this->input = input;
+	this->attrNames = attrNames;
+	this->cond = condition;
+
+	// right side is a join operator not a filter
+	if(cond.bRhsIsAttr);
+
+
+	input->getAttributes(inputAttrs);
+	inputTupleSize = 0;
+	for (Attribute &attr: inputAttrs) {
+		inputTupleSize += attr.length;
+	}
 }
 
 Filter::~Filter()
@@ -45,12 +56,93 @@ Filter::~Filter()
 
 RC Filter::getNextTuple(void *data)
 {
+	void *origData = malloc(inputTupleSize);
+
+	bool status = false;
+	if (input->getNextTuple(origData) != QE_EOF) {
+		switch (cond.rhsValue.type)
+		{
+			case TypeInt:
+				status = filterData(*(int *)&cond.rhsValue.data, cond.op, origData);
+			case TypeReal:
+				status = filterData(*(float *)&cond.rhsValue.data, cond.op, origData);
+			case TypeVarChar:
+				status = filterData(cond.rhsValue.data, cond.op, origData);
+			default: status = false;
+		}
+		if(status == true){
+			memcpy(data, origData, inputTupleSize);
+		}
+	}
 	return QE_EOF;
 }
 
+bool Filter::filterData(int recordInt, CompOp compOp, const void *value)
+{
+    int32_t intValue;
+    memcpy (&intValue, value, INT_SIZE);
+
+    switch (compOp)
+    {
+        case EQ_OP: return recordInt == intValue;
+        case LT_OP: return recordInt < intValue;
+        case GT_OP: return recordInt > intValue;
+        case LE_OP: return recordInt <= intValue;
+        case GE_OP: return recordInt >= intValue;
+        case NE_OP: return recordInt != intValue;
+        case NO_OP: return true;
+        // Should never happen
+        default: return false;
+    }
+}
+
+bool Filter::filterData(float recordReal, CompOp compOp, const void *value)
+{
+    float realValue;
+    memcpy (&realValue, value, REAL_SIZE);
+
+    switch (compOp)
+    {
+        case EQ_OP: return recordReal == realValue;
+        case LT_OP: return recordReal < realValue;
+        case GT_OP: return recordReal > realValue;
+        case LE_OP: return recordReal <= realValue;
+        case GE_OP: return recordReal >= realValue;
+        case NE_OP: return recordReal != realValue;
+        case NO_OP: return true;
+        // Should never happen
+        default: return false;
+    }
+}
+
+bool Filter::filterData(void *recordString, CompOp compOp, const void *value)
+{
+    // if (compOp == NO_OP)
+    //     return true;
+
+    // int32_t valueSize;
+    // memcpy(&valueSize, value, VARCHAR_LENGTH_SIZE);
+    // char valueStr[valueSize + 1];
+    // valueStr[valueSize] = '\0';
+    // memcpy(valueStr, (char*) value + VARCHAR_LENGTH_SIZE, valueSize);
+
+    // int cmp = strcmp(recordString, valueStr);
+    // switch (compOp)
+    // {
+    //     case EQ_OP: return cmp == 0;
+    //     case LT_OP: return cmp <  0;
+    //     case GT_OP: return cmp >  0;
+    //     case LE_OP: return cmp <= 0;
+    //     case GE_OP: return cmp >= 0;
+    //     case NE_OP: return cmp != 0;
+    //     // Should never happen
+    //     default: return false;
+    // }
+	return false;
+}
 void Filter::getAttributes(vector<Attribute> &attrs) const
 {
-
+	
 }
 
 Project::Project(Iterator *input, const vector<string> &attrNames)
