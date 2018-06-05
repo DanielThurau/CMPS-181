@@ -291,8 +291,6 @@ INLJoin::INLJoin(Iterator *leftIn,
 		inputTupleSize += attr.length;
 	}
 
-	CartProd *cp = new CartProd(leftIn, rightIn, condition);
-
 	// Check if all attributes are the same. If so, they're the same table,
 	// and we want to rename the inner one to clarify which is which.
 	bool same = true;
@@ -306,6 +304,8 @@ INLJoin::INLJoin(Iterator *leftIn,
 		}
 	} else same = false;
 	if(same) rightIn->tableName += "2";
+
+	CartProd *cp = new CartProd(leftIn, rightIn, condition);
 }
 
 INLJoin::~INLJoin()
@@ -334,8 +334,8 @@ RC INLJoin::getNextTuple(void *data)
 	return SUCCESS;
 }
 
-RC INLJoin::join(void *origData, void *newData){
-
+RC INLJoin::join(void *origData, void *newData)
+{
 	return SUCCESS;
 }
 
@@ -372,7 +372,7 @@ CartProd::~CartProd()
 
 RC CartProd::getNextTuple(void *data)
 {
-
+	return SUCCESS;
 }
 
 
