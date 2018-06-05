@@ -281,7 +281,6 @@ class CartProd : public Iterator {
     public:
         CartProd(Iterator *leftIn,           // Iterator of input R
                 IndexScan *rightIn,          // IndexScan Iterator of input S
-                const Condition &condition   // Join condition
         );
         ~CartProd();
 
@@ -294,7 +293,6 @@ class CartProd : public Iterator {
         IndexScan *rightIn;
         vector<Attribute> leftAttrs;
         vector<Attribute> rightAttrs;
-        Condition cond;
         unsigned inputTupleSize;
 };
 #endif
