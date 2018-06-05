@@ -217,10 +217,12 @@ class Filter : public Iterator {
         vector<string> attrNames;
         vector<Attribute> inputAttrs;
         Condition cond;
+
+        unsigned index;
         unsigned inputTupleSize;
 
-        bool filterData(int recordInt, CompOp compOp, const void *value);
-        bool filterData(float recordReal, CompOp compOp, const void *value);
+        bool filterData(int recordInt, CompOp compOp, const int value);
+        bool filterData(float recordReal, CompOp compOp, const float value);
         bool filterData(void *recordString, CompOp compOp, const void *value);
 };
 

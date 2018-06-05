@@ -39,11 +39,21 @@ Filter::Filter(Iterator* input, const Condition &condition)
 	this->attrNames = attrNames;
 	this->cond = condition;
 
+
 	// right side is a join operator not a filter
 	if(cond.bRhsIsAttr);
 
 
 	input->getAttributes(inputAttrs);
+
+
+	for(unsigned i = 0; i < inputAttrs.size(); i++){
+		if(inputAttrs[i].name == this->cond.lhsAttr){
+			this->index = i;
+		}
+	}
+
+
 	inputTupleSize = 0;
 	for (Attribute &attr: inputAttrs) {
 		inputTupleSize += attr.length;
@@ -59,29 +69,39 @@ RC Filter::getNextTuple(void *data)
 	void *origData = malloc(inputTupleSize);
 
 	bool status = false;
-	if (input->getNextTuple(origData) != QE_EOF) {
+	while(input->getNextTuple(origData) != QE_EOF) {
+		unsigned recordNullIndicatorSize = getNumNullBytes(inputAttrs.size());
+		char recordNullIndicator[recordNullIndicatorSize];
+		memcpy (recordNullIndicator, origData, recordNullIndicatorSize);
+
+		// value at this position is null
+		if(recordNullIndicator[index]){
+			return -1;
+		}
+
+		// void *
+
 		switch (cond.rhsValue.type)
 		{
 			case TypeInt:
-				status = filterData(*(int *)&cond.rhsValue.data, cond.op, origData);
+				status = filterData(*(int *)&cond.rhsValue.data, cond.op, *(int *)&origAttribute);
 			case TypeReal:
-				status = filterData(*(float *)&cond.rhsValue.data, cond.op, origData);
+				status = filterData(*(float *)&cond.rhsValue.data, cond.op, *(float *)&origAttribute);
 			case TypeVarChar:
-				status = filterData(cond.rhsValue.data, cond.op, origData);
+				status = filterData(cond.rhsValue.data, cond.op, origAttribute);
 			default: status = false;
 		}
+
 		if(status == true){
 			memcpy(data, origData, inputTupleSize);
+			return SUCCESS;
 		}
 	}
 	return QE_EOF;
 }
 
-bool Filter::filterData(int recordInt, CompOp compOp, const void *value)
+bool Filter::filterData(int recordInt, CompOp compOp, const int intValue)
 {
-    int32_t intValue;
-    memcpy (&intValue, value, INT_SIZE);
-
     switch (compOp)
     {
         case EQ_OP: return recordInt == intValue;
@@ -96,11 +116,8 @@ bool Filter::filterData(int recordInt, CompOp compOp, const void *value)
     }
 }
 
-bool Filter::filterData(float recordReal, CompOp compOp, const void *value)
+bool Filter::filterData(float recordReal, CompOp compOp, const float realValue)
 {
-    float realValue;
-    memcpy (&realValue, value, REAL_SIZE);
-
     switch (compOp)
     {
         case EQ_OP: return recordReal == realValue;
@@ -142,7 +159,12 @@ bool Filter::filterData(void *recordString, CompOp compOp, const void *value)
 }
 void Filter::getAttributes(vector<Attribute> &attrs) const
 {
-	
+	attrs.clear();
+	for (string attrName: attrNames) {
+		auto pred = [&](Attribute attr) { return attr.name == attrName; };
+		vector<Attribute>::const_iterator attr = find_if(inputAttrs.begin(), inputAttrs.end(), pred);
+		attrs.push_back(*attr);
+	}
 }
 
 Project::Project(Iterator *input, const vector<string> &attrNames)
