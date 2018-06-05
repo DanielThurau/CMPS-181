@@ -274,6 +274,8 @@ INLJoin::INLJoin(Iterator *leftIn,
 		inputTupleSize += attr.length;
 	}
 
+	CartProd *cp = new CartProd(leftIn, rightIn, condition);
+
 	// Check if all attributes are the same. If so, they're the same table,
 	// and we want to rename the inner one to clarify which is which.
 	bool same = true;
@@ -326,5 +328,38 @@ void INLJoin::getAttributes(vector<Attribute> &attrs) const
 	attrs.clear();
 	attrs = this->leftAttrs;
 	attrs.insert(attrs.end(), (rightIn->attrs).begin(), (rightIn->attrs).end());
+
+}
+
+CartProd::CartProd(Iterator *leftIn,
+	  IndexScan *rightIn,
+	  const Condition &condition)
+{
+
+	this->leftIn = leftIn;
+	this->rightIn = rightIn;
+	leftIn->getAttributes(leftAttrs);
+	rightIn->getAttributes(rightAttrs);
+	this->cond = condition;
+	inputTupleSize = 0;
+
+	for(Attribute attr: leftAttrs) {
+		inputTupleSize += attr.length;
+	}
+
+}
+
+CartProd::~CartProd()
+{
+}
+
+RC CartProd::getNextTuple(void *data)
+{
+
+}
+
+
+void CartProd::getAttributes(vector<Attribute> &attrs) const
+{
 
 }

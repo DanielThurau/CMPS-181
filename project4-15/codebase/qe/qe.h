@@ -275,4 +275,25 @@ class INLJoin : public Iterator {
 };
 
 
+class CartProd : public Iterator {
+    
+    public:
+        CartProd(Iterator *leftIn,           // Iterator of input R
+                IndexScan *rightIn,          // IndexScan Iterator of input S
+                const Condition &condition   // Join condition
+        );
+        ~CartProd();
+
+        RC getNextTuple(void *data);
+        // For attribute in vector<Attribute>, name it as rel.attr
+        void getAttributes(vector<Attribute> &attrs) const;
+
+    private:
+        Iterator *leftIn;
+        IndexScan *rightIn;
+        vector<Attribute> leftAttrs;
+        vector<Attribute> rightAttrs;
+        Condition cond;
+        unsigned inputTupleSize;
+};
 #endif
