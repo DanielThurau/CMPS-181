@@ -314,23 +314,6 @@ INLJoin::~INLJoin()
 
 RC INLJoin::getNextTuple(void *data)
 {
-	void *origData = malloc(inputTupleSize);
-	IndexScan *riCopy = rightIn;
-
-	if(leftIn->getNextTuple(origData) != QE_EOF) {
-
-		// If we are not one checking every tuple in the rightIn,
-		// we continue scanning through that.
-		if(rightIn->getNextTuple(origData) != QE_EOF)
-
-			if(join(origData, data))
-				return QE_EOF;
-
-		// Otherwise, we reset rightIn for the next tuple to be
-		// scanned.
-		riCopy = new IndexScan(rightIn->rm, rightIn->tableName,
-									rightIn->attrName);
-	}
 	return SUCCESS;
 }
 
@@ -348,19 +331,16 @@ void INLJoin::getAttributes(vector<Attribute> &attrs) const
 
 }
 
-CartProd::CartProd(Iterator *leftIn,
-	  IndexScan *rightIn,
-	  const Condition &condition)
+CartProd::CartProd(Iterator *leftIn, IndexScan *rightIn)
 {
 
 	this->leftIn = leftIn;
 	this->rightIn = rightIn;
 	leftIn->getAttributes(leftAttrs);
 	rightIn->getAttributes(rightAttrs);
-	this->cond = condition;
 	inputTupleSize = 0;
 
-	for(Attribute attr: leftAttrs) {
+	for(Attribute attr : leftAttrs){
 		inputTupleSize += attr.length;
 	}
 
@@ -372,6 +352,23 @@ CartProd::~CartProd()
 
 RC CartProd::getNextTuple(void *data)
 {
+	void *origData = malloc(inputTupleSize);
+	IndexScan *riCopy = rightIn;
+
+	if(leftIn->getNextTuple(origData) != QE_EOF) {
+
+		// If we are not one checking every tuple in the rightIn,
+		// we continue scanning through that.
+		if(rightIn->getNextTuple(origData) != QE_EOF)
+
+			if(join(origData, data))
+				return QE_EOF;
+
+		// Otherwise, we reset rightIn for the next tuple to be
+		// scanned.
+		riCopy = new IndexScan(rightIn->rm, rightIn->tableName,
+									rightIn->attrName);
+	}
 	return SUCCESS;
 }
 
