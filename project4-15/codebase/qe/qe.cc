@@ -33,6 +33,13 @@ unsigned Iterator::getFieldLength(void *field, Attribute &attr) {
 	return length;
 }
 
+bool Iterator::recordDescriptorsEqual(vector<Attribute> &rd_1, vector<Attribute> &rd_2) {
+	if (rd_1.size() != rd_2.size())
+		return false;
+	
+	return equal(rd_1.begin(), rd_1.end(), rd_2.begin(), rd_2.end());
+}
+
 Filter::Filter(Iterator* input, const Condition &condition)
 {
 	this->input = input;
@@ -274,38 +281,10 @@ INLJoin::INLJoin(Iterator *leftIn,
 	  IndexScan *rightIn,
 	  const Condition &condition)
 {
-	// Verify that the condition contains two attributes (it is a JOIN).
-	if(!condition.bRhsIsAttr);
+	CartProd *cartProd = new CartProd(leftIn, rightIn);
+	cartProd->getAttributes(attrs);
 
-	// Check if right attribute matches condition.
-	if(rightIn->attrName == condition.rhsAttr);
-
-	this->leftIn = leftIn;
-	this->rightIn = rightIn;
-	leftIn->getAttributes(leftAttrs);
-	rightIn->getAttributes(rightAttrs);
-	this->cond = condition;
-	inputTupleSize = 0;
-
-	for(Attribute attr: leftAttrs) {
-		inputTupleSize += attr.length;
-	}
-
-	// Check if all attributes are the same. If so, they're the same table,
-	// and we want to rename the inner one to clarify which is which.
-	bool same = true;
-	if(leftAttrs.size() == rightAttrs.size()){
-
-		for(unsigned i = 0; i < leftAttrs.size(); i++){
-			if(leftAttrs[i].name != rightAttrs[i].name){
-				same = false;
-				break;
-			}
-		}
-	} else same = false;
-	if(same) rightIn->tableName += "2";
-
-	CartProd *cp = new CartProd(leftIn, rightIn, condition);
+	filter = new Filter(cartProd, condition);
 }
 
 INLJoin::~INLJoin()
@@ -317,18 +296,10 @@ RC INLJoin::getNextTuple(void *data)
 	return SUCCESS;
 }
 
-RC INLJoin::join(void *origData, void *newData)
-{
-	return SUCCESS;
-}
-
 void INLJoin::getAttributes(vector<Attribute> &attrs) const
 {
-	// Setting attrs to all attributes represented in inner and outer tables.
 	attrs.clear();
-	attrs = this->leftAttrs;
-	attrs.insert(attrs.end(), (rightIn->attrs).begin(), (rightIn->attrs).end());
-
+	copy(this->attrs.begin(), this->attrs.end(), attrs.begin());
 }
 
 CartProd::CartProd(Iterator *leftIn, IndexScan *rightIn)
@@ -375,5 +346,7 @@ RC CartProd::getNextTuple(void *data)
 
 void CartProd::getAttributes(vector<Attribute> &attrs) const
 {
-
+	attrs.clear();
+	copy(leftAttrs.begin(), leftAttrs.end(), attrs.begin());
+	attrs.insert(attrs.end(), rightAttrs.begin(), rightAttrs.end());
 }
