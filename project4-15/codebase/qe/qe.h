@@ -288,6 +288,9 @@ class CartProd : public Iterator {
         IndexScan *rightIn;
         vector<Attribute> leftAttrs;
         vector<Attribute> rightAttrs;
-        unsigned inputTupleSize;
+        unsigned leftInputTupleSize;
+        unsigned rightInputTupleSize;
+
+        void* leftData;
 };
 #endif

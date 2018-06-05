@@ -285,6 +285,16 @@ INLJoin::INLJoin(Iterator *leftIn,
 	cartProd->getAttributes(attrs);
 
 	filter = new Filter(cartProd, condition);
+
+	// Check if all attributes are the same. If so, they're the same table,
+	// and we want to rename the inner one to clarify which is which.
+	vector<Attribute> leftAttrs;
+	leftIn->getAttributes(leftAttrs);
+	vector<Attribute> rightAttrs;
+	rightIn->getAttributes(rightAttrs);
+	bool same = recordDescriptorsEqual(leftAttrs, rightAttrs);
+
+	if(same) rightIn->tableName += "2";
 }
 
 INLJoin::~INLJoin()
@@ -302,44 +312,57 @@ void INLJoin::getAttributes(vector<Attribute> &attrs) const
 	copy(this->attrs.begin(), this->attrs.end(), attrs.begin());
 }
 
+// Pretty much assumes all properties of the INLJoin that calls it (except the
+// Condition) and iterates through the inner table for every tuple in the outer
 CartProd::CartProd(Iterator *leftIn, IndexScan *rightIn)
 {
-
 	this->leftIn = leftIn;
 	this->rightIn = rightIn;
 	leftIn->getAttributes(leftAttrs);
 	rightIn->getAttributes(rightAttrs);
-	inputTupleSize = 0;
 
+	leftInputTupleSize = 0;
 	for(Attribute attr : leftAttrs){
-		inputTupleSize += attr.length;
+		leftInputTupleSize += attr.length;
 	}
 
+	rightInputTupleSize = 0;
+	for(Attribute attr : rightAttrs){
+		rightInputTupleSize += attr.length;
+	}
+
+	leftData = malloc(leftInputTupleSize);
+	leftIn->getNextTuple(leftData);
 }
 
 CartProd::~CartProd()
 {
+	free(leftData);
 }
 
 RC CartProd::getNextTuple(void *data)
 {
-	void *origData = malloc(inputTupleSize);
-	IndexScan *riCopy = rightIn;
+	void *rightData = malloc(rightInputTupleSize);
 
-	if(leftIn->getNextTuple(origData) != QE_EOF) {
+	if(rightIn->getNextTuple(rightData) == QE_EOF){
 
-		// If we are not one checking every tuple in the rightIn,
-		// we continue scanning through that.
-		if(rightIn->getNextTuple(origData) != QE_EOF)
+		if(leftIn->getNextTuple(leftData) == QE_EOF){
+			free(rightData);
+			return QE_EOF;
+		}
 
-			if(join(origData, data))
-				return QE_EOF;
-
-		// Otherwise, we reset rightIn for the next tuple to be
-		// scanned.
-		riCopy = new IndexScan(rightIn->rm, rightIn->tableName,
-									rightIn->attrName);
+		if (rightIn->getNextTuple(rightData) == QE_EOF) {
+			free(rightData);
+			return QE_EOF;
+		}
+		rightIn->setIterator(NULL, NULL, true, true);
 	}
+
+	memcpy(data, leftData, leftInputTupleSize);
+	memcpy((char *) data + leftInputTupleSize,
+		rightData, rightInputTupleSize);
+
+	free(rightData);
 	return SUCCESS;
 }
 
