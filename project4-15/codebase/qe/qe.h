@@ -219,9 +219,10 @@ class Filter : public Iterator {
         Condition cond;
 
         unsigned index;
+        AttrType compType; 
         unsigned inputTupleSize;
 
-        bool filterData(int recordInt, CompOp compOp, const int value);
+        bool filterData(uint32_t recordInt, CompOp compOp, const uint32_t value);
         bool filterData(float recordReal, CompOp compOp, const float value);
         bool filterData(void *recordString, CompOp compOp, const void *value);
 };

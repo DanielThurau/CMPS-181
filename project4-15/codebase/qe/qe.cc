@@ -49,6 +49,7 @@ Filter::Filter(Iterator* input, const Condition &condition)
 
 	for(unsigned i = 0; i < inputAttrs.size(); i++){
 		if(inputAttrs[i].name == this->cond.lhsAttr){
+			compType = inputAttrs[i].type;
 			this->index = i;
 		}
 	}
@@ -67,28 +68,44 @@ Filter::~Filter()
 RC Filter::getNextTuple(void *data)
 {
 	void *origData = malloc(inputTupleSize);
+	void *origAttr= malloc(compType);
 
 	bool status = false;
 	while(input->getNextTuple(origData) != QE_EOF) {
-		unsigned recordNullIndicatorSize = getNumNullBytes(inputAttrs.size());
-		char recordNullIndicator[recordNullIndicatorSize];
-		memcpy (recordNullIndicator, origData, recordNullIndicatorSize);
+		unsigned nullIndicatorSize = getNumNullBytes(inputAttrs.size());
 
 		// value at this position is null
-		if(recordNullIndicator[index]){
-			return -1;
+		if(fieldIsNull(origData, index)){
+			if(cond.op == NO_OP){
+				memcpy(data, origData, inputTupleSize);
+				return SUCCESS;
+			}
 		}
 
-		// void *
+		unsigned offset = sizeof(nullIndicatorSize);
+		// advance data through fields until we reach index
+		for (unsigned i = 0; i < index; i++) {
+			switch (inputAttrs[i].type) {
+			case TypeInt:
+			case TypeReal:
+				offset += INT_SIZE;
+				break;
+			case TypeVarChar:
+				uint32_t varchar_length;
+				memcpy(&varchar_length, data, VARCHAR_LENGTH_SIZE);
+				offset += VARCHAR_LENGTH_SIZE + varchar_length;
+				break;
+			}
+		}
 
 		switch (cond.rhsValue.type)
 		{
 			case TypeInt:
-				status = filterData(*(int *)&cond.rhsValue.data, cond.op, *(int *)&origAttribute);
+				status = filterData(*(uint32_t *)cond.rhsValue.data, cond.op, *(uint32_t *)origAttr);
 			case TypeReal:
-				status = filterData(*(float *)&cond.rhsValue.data, cond.op, *(float *)&origAttribute);
+				status = filterData(*(float *)cond.rhsValue.data, cond.op, *(float *)origAttr);
 			case TypeVarChar:
-				status = filterData(cond.rhsValue.data, cond.op, origAttribute);
+				status = filterData(cond.rhsValue.data, cond.op, origAttr);
 			default: status = false;
 		}
 
@@ -100,7 +117,7 @@ RC Filter::getNextTuple(void *data)
 	return QE_EOF;
 }
 
-bool Filter::filterData(int recordInt, CompOp compOp, const int intValue)
+bool Filter::filterData(uint32_t recordInt, CompOp compOp, const uint32_t intValue)
 {
     switch (compOp)
     {
