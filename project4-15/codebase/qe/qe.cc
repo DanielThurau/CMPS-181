@@ -5,7 +5,7 @@
 bool Iterator::fieldIsNull(void *data, int i) {
 	uint8_t nullByte = ((uint8_t *) data)[i / 8];
 	uint8_t mask = 128 >> (i % 8);
-	return (nullByte & mask) > 0;
+	return nullByte & mask;
 }
 
 void Iterator::setFieldNull(void *data, int i) {
@@ -31,6 +31,18 @@ unsigned Iterator::getFieldLength(void *field, Attribute &attr) {
 	}
 	}
 	return length;
+}
+
+unsigned Iterator::getActualTupleLength(void *tuple, vector<Attribute> &recordDescriptor) {
+	unsigned offset = getNumNullBytes(recordDescriptor.size());
+
+	for (size_t i = 0; i < recordDescriptor.size(); i++) {
+		if (!fieldIsNull(tuple, i)) {
+			offset += getFieldLength((char *) tuple + offset, recordDescriptor[i]);
+		}
+	}
+
+	return offset;
 }
 
 Filter::Filter(Iterator* input, const Condition &condition)
@@ -296,74 +308,94 @@ INLJoin::INLJoin(Iterator *leftIn,
 	  IndexScan *rightIn,
 	  const Condition &condition)
 {
-	// Verify that the condition contains two attributes (it is a JOIN).
-	if(!condition.bRhsIsAttr);
+	cartProd = new CartProd(leftIn, rightIn);
+	cartProd->getAttributes(attrs);
 
-	// Check if right attribute matches condition.
-	if(rightIn->attrName == condition.rhsAttr);
-
-	this->leftIn = leftIn;
-	this->rightIn = rightIn;
-	leftIn->getAttributes(leftAttrs);
-	rightIn->getAttributes(rightAttrs);
-	this->cond = condition;
-	inputTupleSize = 0;
-
-	for(Attribute attr: leftAttrs) {
-		inputTupleSize += attr.length;
-	}
-
-	// Check if all attributes are the same. If so, they're the same table,
-	// and we want to rename the inner one to clarify which is which.
-	bool same = true;
-	if(leftAttrs.size() == rightAttrs.size()){
-
-		for(unsigned i = 0; i < leftAttrs.size(); i++){
-			if(leftAttrs[i].name != rightAttrs[i].name){
-				same = false;
-				break;
-			}
-		}
-	} else same = false;
-	if(same) rightIn->tableName += "2";
+	filter = new Filter(cartProd, condition);
 }
 
 INLJoin::~INLJoin()
 {
+	delete cartProd;
+	delete filter;
 }
 
 RC INLJoin::getNextTuple(void *data)
 {
-	void *origData = malloc(inputTupleSize);
-	IndexScan *riCopy = rightIn;
-
-	if(leftIn->getNextTuple(origData) != QE_EOF) {
-
-		// If we are not one checking every tuple in the rightIn,
-		// we continue scanning through that.
-		if(rightIn->getNextTuple(origData) != QE_EOF)
-
-			if(join(origData, data))
-				return QE_EOF;
-
-		// Otherwise, we reset rightIn for the next tuple to be
-		// scanned.
-		riCopy = new IndexScan(rightIn->rm, rightIn->tableName,
-									rightIn->attrName);
-	}
-	return SUCCESS;
-}
-
-RC INLJoin::join(void *origData, void *newData){
-
-	return SUCCESS;
+	return filter->getNextTuple(data);
 }
 
 void INLJoin::getAttributes(vector<Attribute> &attrs) const
 {
-	// Setting attrs to all attributes represented in inner and outer tables.
 	attrs.clear();
-	attrs = this->leftAttrs;
-	attrs.insert(attrs.end(), (rightIn->attrs).begin(), (rightIn->attrs).end());
+	copy(this->attrs.begin(), this->attrs.end(), attrs.begin());
+}
 
+// Pretty much assumes all properties of the INLJoin that calls it (except the
+// Condition) and iterates through the inner table for every tuple in the outer
+CartProd::CartProd(Iterator *leftIn, IndexScan *rightIn)
+{
+	this->leftIn = leftIn;
+	this->rightIn = rightIn;
+	leftIn->getAttributes(leftAttrs);
+	rightIn->getAttributes(rightAttrs);
+
+	leftInputTupleSize = 0;
+	for(Attribute attr : leftAttrs){
+		leftInputTupleSize += attr.length;
+	}
+
+	rightInputTupleSize = 0;
+	for(Attribute attr : rightAttrs){
+		rightInputTupleSize += attr.length;
+	}
+
+	leftData = malloc(leftInputTupleSize);
+
+	leftIterEmpty = leftIn->getNextTuple(leftData) == QE_EOF;
+}
+
+CartProd::~CartProd()
+{
+	free(leftData);
+}
+
+RC CartProd::getNextTuple(void *data)
+{
+	if (leftIterEmpty)
+		return QE_EOF;
+	
+	void *rightData = malloc(rightInputTupleSize);
+
+	if(rightIn->getNextTuple(rightData) == QE_EOF){
+
+		if(leftIn->getNextTuple(leftData) == QE_EOF){
+			free(rightData);
+			return QE_EOF;
+		}
+
+		rightIn->setIterator(NULL, NULL, true, true);
+
+		if (rightIn->getNextTuple(rightData) == QE_EOF) {
+			free(rightData);
+			return QE_EOF;
+		}
+	}
+
+	unsigned leftTupleActualSize = getActualTupleLength(leftData, leftAttrs);
+	unsigned rightTupleActualSize = getActualTupleLength(rightData, rightAttrs);
+
+	memcpy(data, leftData, leftTupleActualSize);
+	memcpy((char *) data + leftTupleActualSize, rightData, rightTupleActualSize);
+
+	free(rightData);
+	return SUCCESS;
+}
+
+
+void CartProd::getAttributes(vector<Attribute> &attrs) const
+{
+	attrs.clear();
+	copy(leftAttrs.begin(), leftAttrs.end(), attrs.begin());
+	attrs.insert(attrs.end(), rightAttrs.begin(), rightAttrs.end());
 }

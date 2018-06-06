@@ -49,6 +49,7 @@ class Iterator {
         void setFieldNull(void *data, int i);
         unsigned getNumNullBytes(unsigned numAttributes);
         unsigned getFieldLength(void *field, Attribute &attr);
+        unsigned getActualTupleLength(void *tuple, vector<Attribute> &recordDescriptor);
 };
 
 
@@ -264,15 +265,33 @@ class INLJoin : public Iterator {
         void getAttributes(vector<Attribute> &attrs) const;
 
     private:
+        Filter *filter;
+        CartProd *cartProd;
+        vector<Attribute> attrs;
+};
+
+
+class CartProd : public Iterator {
+    
+    public:
+        CartProd(Iterator *leftIn,           // Iterator of input R
+                IndexScan *rightIn           // IndexScan Iterator of input S
+        );
+        ~CartProd();
+
+        RC getNextTuple(void *data);
+        // For attribute in vector<Attribute>, name it as rel.attr
+        void getAttributes(vector<Attribute> &attrs) const;
+
+    private:
         Iterator *leftIn;
         IndexScan *rightIn;
         vector<Attribute> leftAttrs;
         vector<Attribute> rightAttrs;
-        Condition cond;
-        unsigned inputTupleSize;
+        unsigned leftInputTupleSize;
+        unsigned rightInputTupleSize;
 
-        RC join(void *origData, void *newData);
+        void* leftData;
+        bool leftIterEmpty;
 };
-
-
 #endif
