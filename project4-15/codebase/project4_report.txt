@@ -19,7 +19,25 @@ Team number (e.g., 01) : 15
 4. Implementation Detail
 - Have you added your own source file (.cc or .h)?
 
+	We did not provide any new files for our implementation.
+
 - Have you implemented any optional features? Then, describe them here.
+
+	As part of our implementation for the INLJoin iterator, we created a new
+	iterator class CartProd (short for "Cartesian Product"), which was
+	basically leveraged for its getNextTuple() function. CartProd assumes all
+	of the same fields as the INLJoin iterator that calls it in its constructor
+	except for the Condition, which it does not need to use.
+
+    Iterator *leftIn:		    	The "outer" table of the join. 
+    IndexScan *rightIn:				The "inner" table of the join.
+    vector<Attribute> leftAttrs:	The 
+    vector<Attribute> rightAttrs;
+    unsigned leftInputTupleSize;
+    unsigned rightInputTupleSize;
+
+	RC CartProd::getNextTuple(void *data):
+		This function 
 
 - Other implementation details:
 
