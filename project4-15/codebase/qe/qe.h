@@ -224,7 +224,7 @@ class Filter : public Iterator {
         unsigned inputTupleSize;
 
         bool filterData(uint32_t recordInt, CompOp compOp, const uint32_t value);
-        bool filterData(float recordReal, CompOp compOp, const float value);
+        bool filterData(float recordReal, CompOp compOp, const void *value);
         bool filterData(void *recordString, CompOp compOp, const void *value);
 };
 

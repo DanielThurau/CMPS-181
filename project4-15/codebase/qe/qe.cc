@@ -100,8 +100,10 @@ RC Filter::getNextTuple(void *data)
 		for (unsigned i = 0; i < index; i++) {
 			switch (inputAttrs[i].type) {
 			case TypeInt:
-			case TypeReal:
 				offset += INT_SIZE;
+				break;
+			case TypeReal:
+				offset += REAL_SIZE;
 				break;
 			case TypeVarChar:
 				uint32_t varchar_length;
@@ -129,7 +131,7 @@ RC Filter::getNextTuple(void *data)
 				status = filterData(*(uint32_t *)origAttr, cond.op, *(uint32_t *)cond.rhsValue.data);
 				break;
 			case TypeReal:
-				status = filterData(*(float *)origAttr, cond.op, *(float *)cond.rhsValue.data);
+				status = filterData(*(float *)origAttr, cond.op, cond.rhsValue.data);
 				break;
 			case TypeVarChar:
 				status = filterData(origAttr, cond.op, cond.rhsValue.data);
@@ -161,8 +163,10 @@ bool Filter::filterData(uint32_t recordInt, CompOp compOp, const uint32_t intVal
     }
 }
 
-bool Filter::filterData(float recordReal, CompOp compOp, const float realValue)
+bool Filter::filterData(float recordReal, CompOp compOp, const void* value)
 {
+	float realValue;
+    memcpy (&realValue, value, REAL_SIZE);
     switch (compOp)
     {
         case EQ_OP: return recordReal == realValue;
