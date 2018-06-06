@@ -251,27 +251,6 @@ class Project : public Iterator {
 
 };
 
-
-class INLJoin : public Iterator {
-    // Index nested-loop join operator
-    public:
-        INLJoin(Iterator *leftIn,           // Iterator of input R
-               IndexScan *rightIn,          // IndexScan Iterator of input S
-               const Condition &condition   // Join condition
-        );
-        ~INLJoin();
-
-        RC getNextTuple(void *data);
-        // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const;
-
-    private:
-        Filter *filter;
-        CartProd *cartProd;
-        vector<Attribute> attrs;
-};
-
-
 class CartProd : public Iterator {
     
     public:
@@ -295,4 +274,24 @@ class CartProd : public Iterator {
         void* leftData;
         bool leftIterEmpty;
 };
+
+class INLJoin : public Iterator {
+    // Index nested-loop join operator
+    public:
+        INLJoin(Iterator *leftIn,           // Iterator of input R
+               IndexScan *rightIn,          // IndexScan Iterator of input S
+               const Condition &condition   // Join condition
+        );
+        ~INLJoin();
+
+        RC getNextTuple(void *data);
+        // For attribute in vector<Attribute>, name it as rel.attr
+        void getAttributes(vector<Attribute> &attrs) const;
+
+    private:
+        Filter *filter;
+        CartProd *cartProd;
+        vector<Attribute> attrs;
+};
+
 #endif
