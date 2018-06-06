@@ -89,8 +89,9 @@ RC Filter::getNextTuple(void *data)
 		if(fieldIsNull(origData, index)){
 			if(cond.op == NO_OP){
 				memcpy(data, origData, inputTupleSize);
-				// free(origData);
 				return SUCCESS;
+			}else{
+				continue;
 			}
 		}
 
@@ -138,13 +139,9 @@ RC Filter::getNextTuple(void *data)
 
 		if(status == true){
 			memcpy(data, origData, inputTupleSize);
-			// free(origAttr);
-			// free(origData);
 			return SUCCESS;
 		}
 	}
-	// free(origAttr);
-	// free(origData);
 	return QE_EOF;
 }
 

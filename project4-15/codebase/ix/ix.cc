@@ -810,13 +810,13 @@ RC IX_ScanIterator::initialize(IXFileHandle &fh, Attribute attribute, const void
     RC rc = im->find(*fileHandle, attr, lowKey, startPageNum);
     if (rc)
     {
-        free(page);
+        // free(page);
         return rc;
     }
     rc = fileHandle->readPage(startPageNum, page);
     if (rc)
     {
-        free(page);
+        // free(page);
         return rc;
     }
 
@@ -882,7 +882,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
 
 RC IX_ScanIterator::close()
 {
-    free(page);
+    // free(page);
     return SUCCESS;
 }
 
