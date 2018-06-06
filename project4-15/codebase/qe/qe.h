@@ -49,6 +49,7 @@ class Iterator {
         void setFieldNull(void *data, int i);
         unsigned getNumNullBytes(unsigned numAttributes);
         unsigned getFieldLength(void *field, Attribute &attr);
+        unsigned getActualTupleLength(void *tuple, vector<Attribute> &recordDescriptor);
 };
 
 

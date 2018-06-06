@@ -33,6 +33,18 @@ unsigned Iterator::getFieldLength(void *field, Attribute &attr) {
 	return length;
 }
 
+unsigned Iterator::getActualTupleLength(void *tuple, vector<Attribute> &recordDescriptor) {
+	unsigned offset = getNumNullBytes(recordDescriptor.size());
+
+	for (size_t i = 0; i < recordDescriptor.size(); i++) {
+		if (!fieldIsNull(tuple, i)) {
+			offset += getFieldLength((char *) tuple + offset, recordDescriptor[i]);
+		}
+	}
+
+	return offset;
+}
+
 Filter::Filter(Iterator* input, const Condition &condition)
 {
 	this->input = input;
@@ -348,9 +360,11 @@ RC CartProd::getNextTuple(void *data)
 		}
 	}
 
-	// concatenate tuples into
-	memcpy(data, leftData, leftInputTupleSize);
-	memcpy((char *) data + leftInputTupleSize, rightData, rightInputTupleSize);
+	unsigned leftTupleActualSize = getActualTupleLength(leftData, leftAttrs);
+	unsigned rightTupleActualSize = getActualTupleLength(rightData, rightAttrs);
+
+	memcpy(data, leftData, leftTupleActualSize);
+	memcpy((char *) data + leftTupleActualSize, rightData, rightTupleActualSize);
 
 	free(rightData);
 	return SUCCESS;
