@@ -1,6 +1,6 @@
 
 #include "qe.h"
-#include "string.h"
+
 
 bool Iterator::fieldIsNull(void *data, int i) {
 	uint8_t nullByte = ((uint8_t *) data)[i / 8];
@@ -49,6 +49,7 @@ Filter::Filter(Iterator* input, const Condition &condition)
 {
 	this->input = input;
 	this->attrNames = attrNames;
+
 	this->cond = condition;
 
 
@@ -61,7 +62,6 @@ Filter::Filter(Iterator* input, const Condition &condition)
 
 	for(unsigned i = 0; i < inputAttrs.size(); i++){
 		if(inputAttrs[i].name == this->cond.lhsAttr){
-			compType = inputAttrs[i].type;
 			this->index = i;
 		}
 	}
@@ -80,21 +80,23 @@ Filter::~Filter()
 RC Filter::getNextTuple(void *data)
 {
 	void *origData = malloc(inputTupleSize);
-	void *origAttr= malloc(compType);
+	void *origAttr= malloc(cond.rhsValue.type);
 
 	bool status = false;
-	while(input->getNextTuple(origData) != QE_EOF) {
+	while(input ->getNextTuple(origData) != QE_EOF) {
 		unsigned nullIndicatorSize = getNumNullBytes(inputAttrs.size());
 
 		// value at this position is null
 		if(fieldIsNull(origData, index)){
 			if(cond.op == NO_OP){
 				memcpy(data, origData, inputTupleSize);
+				free(origAttr);
+				free(origData);
 				return SUCCESS;
 			}
 		}
 
-		unsigned offset = sizeof(nullIndicatorSize);
+		unsigned offset = nullIndicatorSize;
 		// advance data through fields until we reach index
 		for (unsigned i = 0; i < index; i++) {
 			switch (inputAttrs[i].type) {
@@ -104,28 +106,43 @@ RC Filter::getNextTuple(void *data)
 				break;
 			case TypeVarChar:
 				uint32_t varchar_length;
-				memcpy(&varchar_length, data, VARCHAR_LENGTH_SIZE);
+				memcpy(&varchar_length, (char*)origData + offset, VARCHAR_LENGTH_SIZE);
 				offset += VARCHAR_LENGTH_SIZE + varchar_length;
 				break;
 			}
+		}
+		
+		if(cond.rhsValue.type == TypeInt || cond.rhsValue.type == TypeReal){
+			memcpy(origAttr, (char*)origData + offset, INT_SIZE);
+		}else{
+			int32_t varchar_length;
+			memcpy(&varchar_length, (char*)origData + offset, VARCHAR_LENGTH_SIZE);
+			memcpy(origAttr, (char*)origData + offset, varchar_length + VARCHAR_LENGTH_SIZE);
 		}
 
 		switch (cond.rhsValue.type)
 		{
 			case TypeInt:
-				status = filterData(*(uint32_t *)cond.rhsValue.data, cond.op, *(uint32_t *)origAttr);
+				status = filterData(*(uint32_t *)origAttr, cond.op, *(uint32_t *)cond.rhsValue.data);
+				break;
 			case TypeReal:
-				status = filterData(*(float *)cond.rhsValue.data, cond.op, *(float *)origAttr);
+				status = filterData(*(float *)origAttr, cond.op, *(float *)cond.rhsValue.data);
+				break;
 			case TypeVarChar:
-				status = filterData(cond.rhsValue.data, cond.op, origAttr);
+				status = filterData(origAttr, cond.op, cond.rhsValue.data);
+				break;
 			default: status = false;
 		}
 
 		if(status == true){
 			memcpy(data, origData, inputTupleSize);
+			free(origAttr);
+			free(origData);
 			return SUCCESS;
 		}
 	}
+	free(origAttr);
+	free(origData);
 	return QE_EOF;
 }
 
@@ -163,27 +180,32 @@ bool Filter::filterData(float recordReal, CompOp compOp, const float realValue)
 
 bool Filter::filterData(void *recordString, CompOp compOp, const void *value)
 {
-    // if (compOp == NO_OP)
-    //     return true;
 
-    // int32_t valueSize;
-    // memcpy(&valueSize, value, VARCHAR_LENGTH_SIZE);
-    // char valueStr[valueSize + 1];
-    // valueStr[valueSize] = '\0';
-    // memcpy(valueStr, (char*) value + VARCHAR_LENGTH_SIZE, valueSize);
+    int32_t valueSize;
+    memcpy(&valueSize, value, VARCHAR_LENGTH_SIZE);
+    char valueStr[valueSize + 1];
+    valueStr[valueSize] = '\0';
+    memcpy(valueStr, (char*) value + VARCHAR_LENGTH_SIZE, valueSize);
+	
+	int32_t recordSize;
+    memcpy(&recordSize, recordString, VARCHAR_LENGTH_SIZE);
+    char recordStr[recordSize + 1];
+    recordStr[recordSize] = '\0';
+    memcpy(recordStr, (char*) recordString + VARCHAR_LENGTH_SIZE, recordSize);
 
-    // int cmp = strcmp(recordString, valueStr);
-    // switch (compOp)
-    // {
-    //     case EQ_OP: return cmp == 0;
-    //     case LT_OP: return cmp <  0;
-    //     case GT_OP: return cmp >  0;
-    //     case LE_OP: return cmp <= 0;
-    //     case GE_OP: return cmp >= 0;
-    //     case NE_OP: return cmp != 0;
-    //     // Should never happen
-    //     default: return false;
-    // }
+	
+    int cmp = strcmp(recordStr, valueStr);
+    switch (compOp)
+    {
+        case EQ_OP: return cmp == 0;
+        case LT_OP: return cmp <  0;
+        case GT_OP: return cmp >  0;
+        case LE_OP: return cmp <= 0;
+        case GE_OP: return cmp >= 0;
+        case NE_OP: return cmp != 0;
+        // Should never happen
+        default: return false;
+    }
 	return false;
 }
 void Filter::getAttributes(vector<Attribute> &attrs) const

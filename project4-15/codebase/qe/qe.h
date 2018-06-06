@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
@@ -220,7 +221,6 @@ class Filter : public Iterator {
         Condition cond;
 
         unsigned index;
-        AttrType compType; 
         unsigned inputTupleSize;
 
         bool filterData(uint32_t recordInt, CompOp compOp, const uint32_t value);
