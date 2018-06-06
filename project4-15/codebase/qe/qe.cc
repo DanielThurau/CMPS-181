@@ -110,11 +110,13 @@ RC Filter::getNextTuple(void *data)
 		{
 			case TypeInt:
 				status = filterData(*(uint32_t *)origAttr, cond.op, *(uint32_t *)cond.rhsValue.data);
+				break;
 			case TypeReal:
 				status = filterData(*(float *)origAttr, cond.op, *(float *)cond.rhsValue.data);
-
+				break;
 			case TypeVarChar:
 				status = filterData(origAttr, cond.op, cond.rhsValue.data);
+				break;
 			default: status = false;
 		}
 
@@ -160,27 +162,32 @@ bool Filter::filterData(float recordReal, CompOp compOp, const float realValue)
 
 bool Filter::filterData(void *recordString, CompOp compOp, const void *value)
 {
-    // if (compOp == NO_OP)
-    //     return true;
 
-    // int32_t valueSize;
-    // memcpy(&valueSize, value, VARCHAR_LENGTH_SIZE);
-    // char valueStr[valueSize + 1];
-    // valueStr[valueSize] = '\0';
-    // memcpy(valueStr, (char*) value + VARCHAR_LENGTH_SIZE, valueSize);
+    int32_t valueSize;
+    memcpy(&valueSize, value, VARCHAR_LENGTH_SIZE);
+    char valueStr[valueSize + 1];
+    valueStr[valueSize] = '\0';
+    memcpy(valueStr, (char*) value + VARCHAR_LENGTH_SIZE, valueSize);
+	
+	int32_t recordSize;
+    memcpy(&recordSize, recordString, VARCHAR_LENGTH_SIZE);
+    char recordStr[recordSize + 1];
+    recordStr[recordSize] = '\0';
+    memcpy(recordStr, (char*) recordString + VARCHAR_LENGTH_SIZE, recordSize);
 
-    // int cmp = strcmp(recordString, valueStr);
-    // switch (compOp)
-    // {
-    //     case EQ_OP: return cmp == 0;
-    //     case LT_OP: return cmp <  0;
-    //     case GT_OP: return cmp >  0;
-    //     case LE_OP: return cmp <= 0;
-    //     case GE_OP: return cmp >= 0;
-    //     case NE_OP: return cmp != 0;
-    //     // Should never happen
-    //     default: return false;
-    // }
+	
+    int cmp = strcmp(recordStr, valueStr);
+    switch (compOp)
+    {
+        case EQ_OP: return cmp == 0;
+        case LT_OP: return cmp <  0;
+        case GT_OP: return cmp >  0;
+        case LE_OP: return cmp <= 0;
+        case GE_OP: return cmp >= 0;
+        case NE_OP: return cmp != 0;
+        // Should never happen
+        default: return false;
+    }
 	return false;
 }
 void Filter::getAttributes(vector<Attribute> &attrs) const
