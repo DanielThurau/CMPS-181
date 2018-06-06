@@ -5,7 +5,7 @@
 bool Iterator::fieldIsNull(void *data, int i) {
 	uint8_t nullByte = ((uint8_t *) data)[i / 8];
 	uint8_t mask = 128 >> (i % 8);
-	return (nullByte & mask) > 0;
+	return nullByte & mask;
 }
 
 void Iterator::setFieldNull(void *data, int i) {
@@ -31,13 +31,6 @@ unsigned Iterator::getFieldLength(void *field, Attribute &attr) {
 	}
 	}
 	return length;
-}
-
-bool Iterator::recordDescriptorsEqual(vector<Attribute> &rd_1, vector<Attribute> &rd_2) {
-	if (rd_1.size() != rd_2.size())
-		return false;
-	
-	return equal(rd_1.begin(), rd_1.end(), rd_2.begin(), rd_2.end());
 }
 
 Filter::Filter(Iterator* input, const Condition &condition)
@@ -281,29 +274,21 @@ INLJoin::INLJoin(Iterator *leftIn,
 	  IndexScan *rightIn,
 	  const Condition &condition)
 {
-	CartProd *cartProd = new CartProd(leftIn, rightIn);
+	cartProd = new CartProd(leftIn, rightIn);
 	cartProd->getAttributes(attrs);
 
 	filter = new Filter(cartProd, condition);
-
-	// Check if all attributes are the same. If so, they're the same table,
-	// and we want to rename the inner one to clarify which is which.
-	vector<Attribute> leftAttrs;
-	leftIn->getAttributes(leftAttrs);
-	vector<Attribute> rightAttrs;
-	rightIn->getAttributes(rightAttrs);
-	bool same = recordDescriptorsEqual(leftAttrs, rightAttrs);
-
-	if(same) rightIn->tableName += "2";
 }
 
 INLJoin::~INLJoin()
 {
+	delete cartProd;
+	delete filter;
 }
 
 RC INLJoin::getNextTuple(void *data)
 {
-	return SUCCESS;
+	return filter->getNextTuple(data);
 }
 
 void INLJoin::getAttributes(vector<Attribute> &attrs) const
@@ -332,7 +317,8 @@ CartProd::CartProd(Iterator *leftIn, IndexScan *rightIn)
 	}
 
 	leftData = malloc(leftInputTupleSize);
-	leftIn->getNextTuple(leftData);
+
+	leftIterEmpty = leftIn->getNextTuple(leftData) == QE_EOF;
 }
 
 CartProd::~CartProd()
@@ -342,6 +328,9 @@ CartProd::~CartProd()
 
 RC CartProd::getNextTuple(void *data)
 {
+	if (leftIterEmpty)
+		return QE_EOF;
+	
 	void *rightData = malloc(rightInputTupleSize);
 
 	if(rightIn->getNextTuple(rightData) == QE_EOF){
@@ -351,16 +340,17 @@ RC CartProd::getNextTuple(void *data)
 			return QE_EOF;
 		}
 
+		rightIn->setIterator(NULL, NULL, true, true);
+
 		if (rightIn->getNextTuple(rightData) == QE_EOF) {
 			free(rightData);
 			return QE_EOF;
 		}
-		rightIn->setIterator(NULL, NULL, true, true);
 	}
 
+	// concatenate tuples into
 	memcpy(data, leftData, leftInputTupleSize);
-	memcpy((char *) data + leftInputTupleSize,
-		rightData, rightInputTupleSize);
+	memcpy((char *) data + leftInputTupleSize, rightData, rightInputTupleSize);
 
 	free(rightData);
 	return SUCCESS;

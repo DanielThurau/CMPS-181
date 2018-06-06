@@ -49,7 +49,6 @@ class Iterator {
         void setFieldNull(void *data, int i);
         unsigned getNumNullBytes(unsigned numAttributes);
         unsigned getFieldLength(void *field, Attribute &attr);
-        bool recordDescriptorsEqual(vector<Attribute> &rd_1, vector<Attribute> &rd_2);
 };
 
 
@@ -267,6 +266,7 @@ class INLJoin : public Iterator {
 
     private:
         Filter *filter;
+        CartProd *cartProd;
         vector<Attribute> attrs;
 };
 
@@ -292,5 +292,6 @@ class CartProd : public Iterator {
         unsigned rightInputTupleSize;
 
         void* leftData;
+        bool leftIterEmpty;
 };
 #endif
