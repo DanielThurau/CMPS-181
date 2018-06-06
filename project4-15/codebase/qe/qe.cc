@@ -80,8 +80,7 @@ Filter::~Filter()
 RC Filter::getNextTuple(void *data)
 {
 	void *origData = malloc(inputTupleSize);
-	void *origAttr= malloc(cond.rhsValue.type);
-
+	void *origAttr;
 	bool status = false;
 	while(input ->getNextTuple(origData) != QE_EOF) {
 		unsigned nullIndicatorSize = getNumNullBytes(inputAttrs.size());
@@ -90,8 +89,7 @@ RC Filter::getNextTuple(void *data)
 		if(fieldIsNull(origData, index)){
 			if(cond.op == NO_OP){
 				memcpy(data, origData, inputTupleSize);
-				free(origAttr);
-				free(origData);
+				// free(origData);
 				return SUCCESS;
 			}
 		}
@@ -113,10 +111,14 @@ RC Filter::getNextTuple(void *data)
 		}
 		
 		if(cond.rhsValue.type == TypeInt || cond.rhsValue.type == TypeReal){
+			origAttr= malloc(INT_SIZE);
 			memcpy(origAttr, (char*)origData + offset, INT_SIZE);
 		}else{
+			
 			int32_t varchar_length;
 			memcpy(&varchar_length, (char*)origData + offset, VARCHAR_LENGTH_SIZE);
+
+			origAttr= malloc(varchar_length + VARCHAR_LENGTH_SIZE);
 			memcpy(origAttr, (char*)origData + offset, varchar_length + VARCHAR_LENGTH_SIZE);
 		}
 
@@ -136,13 +138,13 @@ RC Filter::getNextTuple(void *data)
 
 		if(status == true){
 			memcpy(data, origData, inputTupleSize);
-			free(origAttr);
-			free(origData);
+			// free(origAttr);
+			// free(origData);
 			return SUCCESS;
 		}
 	}
-	free(origAttr);
-	free(origData);
+	// free(origAttr);
+	// free(origData);
 	return QE_EOF;
 }
 
