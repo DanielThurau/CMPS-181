@@ -1,6 +1,6 @@
 
 #include "qe.h"
-#include "string.h"
+
 
 bool Iterator::fieldIsNull(void *data, int i) {
 	uint8_t nullByte = ((uint8_t *) data)[i / 8];
@@ -116,7 +116,7 @@ RC Filter::getNextTuple(void *data)
 			memcpy(origAttr, (char*)origData + offset, INT_SIZE);
 		}else{
 			int32_t varchar_length;
-			memcpy(&varchar_length, origData + offset, VARCHAR_LENGTH_SIZE);
+			memcpy(&varchar_length, (char*)origData + offset, VARCHAR_LENGTH_SIZE);
 			memcpy(origAttr, (char*)origData + offset, varchar_length + VARCHAR_LENGTH_SIZE);
 		}
 

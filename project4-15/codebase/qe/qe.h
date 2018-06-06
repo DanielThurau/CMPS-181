@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
