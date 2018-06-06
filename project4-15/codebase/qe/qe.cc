@@ -78,6 +78,8 @@ RC Filter::getNextTuple(void *data)
 		if(fieldIsNull(origData, index)){
 			if(cond.op == NO_OP){
 				memcpy(data, origData, inputTupleSize);
+				free(origAttr);
+				free(origData);
 				return SUCCESS;
 			}
 		}
@@ -92,7 +94,7 @@ RC Filter::getNextTuple(void *data)
 				break;
 			case TypeVarChar:
 				uint32_t varchar_length;
-				memcpy(&varchar_length, data, VARCHAR_LENGTH_SIZE);
+				memcpy(&varchar_length, (char*)origData + offset, VARCHAR_LENGTH_SIZE);
 				offset += VARCHAR_LENGTH_SIZE + varchar_length;
 				break;
 			}
@@ -102,8 +104,8 @@ RC Filter::getNextTuple(void *data)
 			memcpy(origAttr, (char*)origData + offset, INT_SIZE);
 		}else{
 			int32_t varchar_length;
-			memcpy(&varchar_length, data, VARCHAR_LENGTH_SIZE);
-			memcpy(origAttr, (char*)origAttr + offset, varchar_length + VARCHAR_LENGTH_SIZE);
+			memcpy(&varchar_length, origData + offset, VARCHAR_LENGTH_SIZE);
+			memcpy(origAttr, (char*)origData + offset, varchar_length + VARCHAR_LENGTH_SIZE);
 		}
 
 		switch (cond.rhsValue.type)
@@ -122,9 +124,13 @@ RC Filter::getNextTuple(void *data)
 
 		if(status == true){
 			memcpy(data, origData, inputTupleSize);
+			free(origAttr);
+			free(origData);
 			return SUCCESS;
 		}
 	}
+	free(origAttr);
+	free(origData);
 	return QE_EOF;
 }
 
