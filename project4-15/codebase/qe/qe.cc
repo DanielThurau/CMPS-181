@@ -1,11 +1,11 @@
 
 #include "qe.h"
-#include "string.h"
+
 
 bool Iterator::fieldIsNull(void *data, int i) {
 	uint8_t nullByte = ((uint8_t *) data)[i / 8];
 	uint8_t mask = 128 >> (i % 8);
-	return (nullByte & mask) > 0;
+	return nullByte & mask;
 }
 
 void Iterator::setFieldNull(void *data, int i) {
@@ -33,17 +33,23 @@ unsigned Iterator::getFieldLength(void *field, Attribute &attr) {
 	return length;
 }
 
-bool Iterator::recordDescriptorsEqual(vector<Attribute> &rd_1, vector<Attribute> &rd_2) {
-	if (rd_1.size() != rd_2.size())
-		return false;
-	
-	return equal(rd_1.begin(), rd_1.end(), rd_2.begin(), rd_2.end());
+unsigned Iterator::getActualTupleLength(void *tuple, vector<Attribute> &recordDescriptor) {
+	unsigned offset = getNumNullBytes(recordDescriptor.size());
+
+	for (size_t i = 0; i < recordDescriptor.size(); i++) {
+		if (!fieldIsNull(tuple, i)) {
+			offset += getFieldLength((char *) tuple + offset, recordDescriptor[i]);
+		}
+	}
+
+	return offset;
 }
 
 Filter::Filter(Iterator* input, const Condition &condition)
 {
 	this->input = input;
 	this->attrNames = attrNames;
+
 	this->cond = condition;
 
 
@@ -56,7 +62,6 @@ Filter::Filter(Iterator* input, const Condition &condition)
 
 	for(unsigned i = 0; i < inputAttrs.size(); i++){
 		if(inputAttrs[i].name == this->cond.lhsAttr){
-			compType = inputAttrs[i].type;
 			this->index = i;
 		}
 	}
@@ -75,10 +80,9 @@ Filter::~Filter()
 RC Filter::getNextTuple(void *data)
 {
 	void *origData = malloc(inputTupleSize);
-	void *origAttr= malloc(compType);
-
+	void *origAttr;
 	bool status = false;
-	while(input->getNextTuple(origData) != QE_EOF) {
+	while(input ->getNextTuple(origData) != QE_EOF) {
 		unsigned nullIndicatorSize = getNumNullBytes(inputAttrs.size());
 
 		// value at this position is null
@@ -86,33 +90,52 @@ RC Filter::getNextTuple(void *data)
 			if(cond.op == NO_OP){
 				memcpy(data, origData, inputTupleSize);
 				return SUCCESS;
+			}else{
+				continue;
 			}
 		}
 
-		unsigned offset = sizeof(nullIndicatorSize);
+		unsigned offset = nullIndicatorSize;
 		// advance data through fields until we reach index
 		for (unsigned i = 0; i < index; i++) {
 			switch (inputAttrs[i].type) {
 			case TypeInt:
-			case TypeReal:
 				offset += INT_SIZE;
+				break;
+			case TypeReal:
+				offset += REAL_SIZE;
 				break;
 			case TypeVarChar:
 				uint32_t varchar_length;
-				memcpy(&varchar_length, data, VARCHAR_LENGTH_SIZE);
+				memcpy(&varchar_length, (char*)origData + offset, VARCHAR_LENGTH_SIZE);
 				offset += VARCHAR_LENGTH_SIZE + varchar_length;
 				break;
 			}
+		}
+		
+		if(cond.rhsValue.type == TypeInt || cond.rhsValue.type == TypeReal){
+			origAttr= malloc(INT_SIZE);
+			memcpy(origAttr, (char*)origData + offset, INT_SIZE);
+		}else{
+			
+			int32_t varchar_length;
+			memcpy(&varchar_length, (char*)origData + offset, VARCHAR_LENGTH_SIZE);
+
+			origAttr= malloc(varchar_length + VARCHAR_LENGTH_SIZE);
+			memcpy(origAttr, (char*)origData + offset, varchar_length + VARCHAR_LENGTH_SIZE);
 		}
 
 		switch (cond.rhsValue.type)
 		{
 			case TypeInt:
-				status = filterData(*(uint32_t *)cond.rhsValue.data, cond.op, *(uint32_t *)origAttr);
+				status = filterData(*(uint32_t *)origAttr, cond.op, *(uint32_t *)cond.rhsValue.data);
+				break;
 			case TypeReal:
-				status = filterData(*(float *)cond.rhsValue.data, cond.op, *(float *)origAttr);
+				status = filterData(*(float *)origAttr, cond.op, cond.rhsValue.data);
+				break;
 			case TypeVarChar:
-				status = filterData(cond.rhsValue.data, cond.op, origAttr);
+				status = filterData(origAttr, cond.op, cond.rhsValue.data);
+				break;
 			default: status = false;
 		}
 
@@ -140,8 +163,10 @@ bool Filter::filterData(uint32_t recordInt, CompOp compOp, const uint32_t intVal
     }
 }
 
-bool Filter::filterData(float recordReal, CompOp compOp, const float realValue)
+bool Filter::filterData(float recordReal, CompOp compOp, const void* value)
 {
+	float realValue;
+    memcpy (&realValue, value, REAL_SIZE);
     switch (compOp)
     {
         case EQ_OP: return recordReal == realValue;
@@ -158,27 +183,32 @@ bool Filter::filterData(float recordReal, CompOp compOp, const float realValue)
 
 bool Filter::filterData(void *recordString, CompOp compOp, const void *value)
 {
-    // if (compOp == NO_OP)
-    //     return true;
 
-    // int32_t valueSize;
-    // memcpy(&valueSize, value, VARCHAR_LENGTH_SIZE);
-    // char valueStr[valueSize + 1];
-    // valueStr[valueSize] = '\0';
-    // memcpy(valueStr, (char*) value + VARCHAR_LENGTH_SIZE, valueSize);
+    int32_t valueSize;
+    memcpy(&valueSize, value, VARCHAR_LENGTH_SIZE);
+    char valueStr[valueSize + 1];
+    valueStr[valueSize] = '\0';
+    memcpy(valueStr, (char*) value + VARCHAR_LENGTH_SIZE, valueSize);
+	
+	int32_t recordSize;
+    memcpy(&recordSize, recordString, VARCHAR_LENGTH_SIZE);
+    char recordStr[recordSize + 1];
+    recordStr[recordSize] = '\0';
+    memcpy(recordStr, (char*) recordString + VARCHAR_LENGTH_SIZE, recordSize);
 
-    // int cmp = strcmp(recordString, valueStr);
-    // switch (compOp)
-    // {
-    //     case EQ_OP: return cmp == 0;
-    //     case LT_OP: return cmp <  0;
-    //     case GT_OP: return cmp >  0;
-    //     case LE_OP: return cmp <= 0;
-    //     case GE_OP: return cmp >= 0;
-    //     case NE_OP: return cmp != 0;
-    //     // Should never happen
-    //     default: return false;
-    // }
+	
+    int cmp = strcmp(recordStr, valueStr);
+    switch (compOp)
+    {
+        case EQ_OP: return cmp == 0;
+        case LT_OP: return cmp <  0;
+        case GT_OP: return cmp >  0;
+        case LE_OP: return cmp <= 0;
+        case GE_OP: return cmp >= 0;
+        case NE_OP: return cmp != 0;
+        // Should never happen
+        default: return false;
+    }
 	return false;
 }
 void Filter::getAttributes(vector<Attribute> &attrs) const
@@ -281,29 +311,21 @@ INLJoin::INLJoin(Iterator *leftIn,
 	  IndexScan *rightIn,
 	  const Condition &condition)
 {
-	CartProd *cartProd = new CartProd(leftIn, rightIn);
+	cartProd = new CartProd(leftIn, rightIn);
 	cartProd->getAttributes(attrs);
 
 	filter = new Filter(cartProd, condition);
-
-	// Check if all attributes are the same. If so, they're the same table,
-	// and we want to rename the inner one to clarify which is which.
-	vector<Attribute> leftAttrs;
-	leftIn->getAttributes(leftAttrs);
-	vector<Attribute> rightAttrs;
-	rightIn->getAttributes(rightAttrs);
-	bool same = recordDescriptorsEqual(leftAttrs, rightAttrs);
-
-	if(same) rightIn->tableName += "2";
 }
 
 INLJoin::~INLJoin()
 {
+	delete cartProd;
+	delete filter;
 }
 
 RC INLJoin::getNextTuple(void *data)
 {
-	return SUCCESS;
+	return filter->getNextTuple(data);
 }
 
 void INLJoin::getAttributes(vector<Attribute> &attrs) const
@@ -332,7 +354,8 @@ CartProd::CartProd(Iterator *leftIn, IndexScan *rightIn)
 	}
 
 	leftData = malloc(leftInputTupleSize);
-	leftIn->getNextTuple(leftData);
+
+	leftIterEmpty = leftIn->getNextTuple(leftData) == QE_EOF;
 }
 
 CartProd::~CartProd()
@@ -342,6 +365,9 @@ CartProd::~CartProd()
 
 RC CartProd::getNextTuple(void *data)
 {
+	if (leftIterEmpty)
+		return QE_EOF;
+	
 	void *rightData = malloc(rightInputTupleSize);
 
 	if(rightIn->getNextTuple(rightData) == QE_EOF){
@@ -351,16 +377,19 @@ RC CartProd::getNextTuple(void *data)
 			return QE_EOF;
 		}
 
+		rightIn->setIterator(NULL, NULL, true, true);
+
 		if (rightIn->getNextTuple(rightData) == QE_EOF) {
 			free(rightData);
 			return QE_EOF;
 		}
-		rightIn->setIterator(NULL, NULL, true, true);
 	}
 
-	memcpy(data, leftData, leftInputTupleSize);
-	memcpy((char *) data + leftInputTupleSize,
-		rightData, rightInputTupleSize);
+	unsigned leftTupleActualSize = getActualTupleLength(leftData, leftAttrs);
+	unsigned rightTupleActualSize = getActualTupleLength(rightData, rightAttrs);
+
+	memcpy(data, leftData, leftTupleActualSize);
+	memcpy((char *) data + leftTupleActualSize, rightData, rightTupleActualSize);
 
 	free(rightData);
 	return SUCCESS;

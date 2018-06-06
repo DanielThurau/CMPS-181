@@ -40,3 +40,7 @@ clean:
 	-rm qetest_01 qetest_02 qetest_03 qetest_04 qetest_05 qetest_06 qetest_09 qetest_10 qetest_dan *.a *.o *~ Tables* Columns* Indexes* left* right* large* *.ix
 	$(MAKE) -C $(CODEROOT)/rm clean
 	$(MAKE) -C $(CODEROOT)/ix clean 
+
+.PHONY: cleantbl
+cleantbl:
+	-rm Tables* Columns* Indexes* left* right* large* *.ix

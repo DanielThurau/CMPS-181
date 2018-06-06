@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
@@ -49,7 +50,7 @@ class Iterator {
         void setFieldNull(void *data, int i);
         unsigned getNumNullBytes(unsigned numAttributes);
         unsigned getFieldLength(void *field, Attribute &attr);
-        bool recordDescriptorsEqual(vector<Attribute> &rd_1, vector<Attribute> &rd_2);
+        unsigned getActualTupleLength(void *tuple, vector<Attribute> &recordDescriptor);
 };
 
 
@@ -220,11 +221,10 @@ class Filter : public Iterator {
         Condition cond;
 
         unsigned index;
-        AttrType compType; 
         unsigned inputTupleSize;
 
         bool filterData(uint32_t recordInt, CompOp compOp, const uint32_t value);
-        bool filterData(float recordReal, CompOp compOp, const float value);
+        bool filterData(float recordReal, CompOp compOp, const void *value);
         bool filterData(void *recordString, CompOp compOp, const void *value);
 };
 
@@ -251,26 +251,6 @@ class Project : public Iterator {
 
 };
 
-
-class INLJoin : public Iterator {
-    // Index nested-loop join operator
-    public:
-        INLJoin(Iterator *leftIn,           // Iterator of input R
-               IndexScan *rightIn,          // IndexScan Iterator of input S
-               const Condition &condition   // Join condition
-        );
-        ~INLJoin();
-
-        RC getNextTuple(void *data);
-        // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const;
-
-    private:
-        Filter *filter;
-        vector<Attribute> attrs;
-};
-
-
 class CartProd : public Iterator {
     
     public:
@@ -292,5 +272,26 @@ class CartProd : public Iterator {
         unsigned rightInputTupleSize;
 
         void* leftData;
+        bool leftIterEmpty;
 };
+
+class INLJoin : public Iterator {
+    // Index nested-loop join operator
+    public:
+        INLJoin(Iterator *leftIn,           // Iterator of input R
+               IndexScan *rightIn,          // IndexScan Iterator of input S
+               const Condition &condition   // Join condition
+        );
+        ~INLJoin();
+
+        RC getNextTuple(void *data);
+        // For attribute in vector<Attribute>, name it as rel.attr
+        void getAttributes(vector<Attribute> &attrs) const;
+
+    private:
+        Filter *filter;
+        CartProd *cartProd;
+        vector<Attribute> attrs;
+};
+
 #endif
