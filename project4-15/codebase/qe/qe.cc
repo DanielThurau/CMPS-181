@@ -60,7 +60,7 @@ Filter::Filter(Iterator* input, const Condition &condition)
 	input->getAttributes(inputAttrs);
 
 
-	for(unsigned i = 0; i < inputAttrs.size(); i++){
+	for(unsigned i = 0; i < inputAttrs.size(); ++i){
 		if(inputAttrs[i].name == this->cond.lhsAttr){
 			this->index = i;
 		}
@@ -82,7 +82,9 @@ RC Filter::getNextTuple(void *data)
 	void *origData = malloc(inputTupleSize);
 	void *origAttr;
 	bool status = false;
-	while(input ->getNextTuple(origData) != QE_EOF) {
+	RC rc;
+	while((rc = input ->getNextTuple(origData)) == SUCCESS) {
+		std::cout << rc << std::endl;
 		unsigned nullIndicatorSize = getNumNullBytes(inputAttrs.size());
 
 		// value at this position is null
@@ -100,10 +102,8 @@ RC Filter::getNextTuple(void *data)
 		for (unsigned i = 0; i < index; i++) {
 			switch (inputAttrs[i].type) {
 			case TypeInt:
-				offset += INT_SIZE;
-				break;
 			case TypeReal:
-				offset += REAL_SIZE;
+				offset += INT_SIZE;
 				break;
 			case TypeVarChar:
 				uint32_t varchar_length;
@@ -131,7 +131,7 @@ RC Filter::getNextTuple(void *data)
 				status = filterData(*(uint32_t *)origAttr, cond.op, *(uint32_t *)cond.rhsValue.data);
 				break;
 			case TypeReal:
-				status = filterData(*(float *)origAttr, cond.op, cond.rhsValue.data);
+				status = filterData(*(float*)origAttr, cond.op, *(float*)cond.rhsValue.data);
 				break;
 			case TypeVarChar:
 				status = filterData(origAttr, cond.op, cond.rhsValue.data);
@@ -163,10 +163,8 @@ bool Filter::filterData(uint32_t recordInt, CompOp compOp, const uint32_t intVal
     }
 }
 
-bool Filter::filterData(float recordReal, CompOp compOp, const void* value)
+bool Filter::filterData(float recordReal, CompOp compOp, const float realValue)
 {
-	float realValue;
-    memcpy (&realValue, value, REAL_SIZE);
     switch (compOp)
     {
         case EQ_OP: return recordReal == realValue;
