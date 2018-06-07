@@ -1081,16 +1081,14 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
         return rc;
     
     // alloc a buffer big enough for the attribute + null indicator
-    void *tuple = malloc(attr->length + 1);
+    void *key = malloc(attr->length + 1);
 
     IXFileHandle ixfileHandle;
     im->openFile(index_filename, ixfileHandle);
-    while (scanner.getNextTuple(rid, tuple) != RM_EOF) {
+    while (scanner.getNextTuple(rid, key) != RM_EOF) {
         // insert each entry into the index
         // use key + 1 to skip null indicator
-        void *key;
-        getAttrFromTuple(recordDescriptor, attr - recordDescriptor.begin(), tuple, key);
-        im->insertEntry(ixfileHandle, *attr, key, rid);
+        im->insertEntry(ixfileHandle, *attr, (char *) key + 1, rid);
     }
     im->closeFile(ixfileHandle);
 
