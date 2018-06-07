@@ -18,6 +18,13 @@ Team number (e.g., 01) : 15
 3. Index Nested Loop Join
 - Describe how your Index Nested Loop Join works.
 
+    We reduce the complexity of the problem of Nested Loop Join by creating a new
+    iterator class called CartesianProduct (see section 4 for more details) that 
+    will create the same Iterator API used throughout the project. The 
+    CartesianProduct of the two attributes from the two tuples will then allow 
+    for a filter iterator to apply the condition specified originally in 
+    the INLJoin iterator, and return a joined tuple at every call of 
+    INLJoin.getNextTuple().
 	
 
 4. Implementation Detail
@@ -140,6 +147,9 @@ Team number (e.g., 01) : 15
 
 	INLJoin = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+    class INLJoin : public Iterator() is the implememntation of an iterator class to add the 
+    option of joins to the querying engine. It will take two tuples passed by previous iterators 
+    and join the two tuples on given conditional attributes.
 
 
 	
