@@ -33,12 +33,12 @@ Team number (e.g., 01) : 15
 	of the same fields as the INLJoin iterator that calls it in its constructor
 	except for the Condition, which it does not need to use.
 
-    Iterator *leftIn:		    	The "outer" table of the join. 
-    IndexScan *rightIn:				The "inner" table of the join.
-    vector<Attribute> leftAttrs:	Attributes of "outer" table.
-    vector<Attribute> rightAttrs:	Attributes of "outer" table.
-    unsigned leftInputTupleSize:	The size of all tuples in the "outer".
-    unsigned rightInputTupleSize:	The size of all tuples in the "inner".
+	Iterator *leftIn:				The "outer" table of the join. 
+	IndexScan *rightIn:				The "inner" table of the join.
+	vector<Attribute> leftAttrs:	Attributes of "outer" table.
+	vector<Attribute> rightAttrs:	Attributes of "outer" table.
+	unsigned leftInputTupleSize:	The size of all tuples in the "outer".
+	unsigned rightInputTupleSize:	The size of all tuples in the "inner".
 
 	RC CartProd::getNextTuple(void *data):
 		This function scans through all tuples in the outer table with rightIn
@@ -116,64 +116,75 @@ Team number (e.g., 01) : 15
 
 	Filter = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    class Filter : public Iterator() is the implememntation of an iterator class to add the 
-    option of filtering to the querying engine. It will take tuples passed by
-    previous iterators and apply a conditional operator to specified attributes
-    and return data that passes the condition.
+	class Filter : public Iterator() is the implememntation of an iterator
+	class to add the option of filtering to the querying engine. It will take
+	tuples passed by previous iterators and apply a conditional operator to
+	specified attributes and return data that passes the condition.
 
-    Iterator *input:                An input iterator that provides entries to the filter
-    vector<string> attrNames:       A vector of attribute names to be provided to iterators using filter
-    vector<Attribute> inputAttrs:   The set of aattributes provided by the input iterator
-    Condition cond:                 The condition struct provides the conditional values needed to apply the filter.
-    unsigned index:                 The index of the attribute the filter is being applied to.
-    unsigned inputTupleSize:        The size of the tuple being provided by the input iterator.
+	Iterator *input:
+		An input iterator that provides entries to the filter.
+	vector<string> attrNames:
+		A vector of attribute names to be provided to iterators using filter.
+	vector<Attribute> inputAttrs:
+		The set of aattributes provided by the input iterator.
+	Condition cond:
+		The condition struct provides the conditional values needed to apply
+		the filter.
+	unsigned index:
+		The index of the attribute the filter is being applied to.
+	unsigned inputTupleSize:
+		The size of the tuple being provided by the input iterator.
 
-    RC getNextTuple(void *data)
-        getNextTuple will call the api of the input iterator for the next entry in 
-        the list and apply one of the filter functions on the data. This functions is 
-        responsible for checking correctness of the condition input, the data being 
-        passed in from the input iterator, and formatting the attribute of the data
-        being filtered.
+	RC getNextTuple(void *data)
+		getNextTuple will call the api of the input iterator for the next entry
+		in the list and apply one of the filter functions on the data. This
+		functions is responsible for checking correctness of the condition
+		input, the data being passed in from the input iterator, and formatting
+		the attribute of the data being filtered.
 
-    bool filterData(<uint32_t/float/void*> record<Type>, CompOp compOp, const <uint32_t/float/void*> value)
-        filterData takes a type of data and applies the compop and returns the boolean
-        value from applying compop on record and value. If the attributes are varchar's, 
-        filterData() converts the void* to null terminated strings and uses strcmp to
-        determine boolean.
+	bool filterData(<uint32_t/float/void*> record<Type>, CompOp compOp,
+	  const <uint32_t/float/void*> value)
+		filterData takes a type of data and applies the compop and returns the
+		boolean value from applying compop on record and value. If the
+		attributes are varchar's, filterData() converts the void* to null
+		terminated strings and uses strcmp to determine boolean.
 
-    void getAttributes(vector<Attribute> &attrs) const
-        getAttributes provides the list of attributes used after the filter is applied. 
-        For the case of filter, the attributes always remain the same and the vector is 
-        formatted and returned.
-
+	void getAttributes(vector<Attribute> &attrs) const
+		getAttributes provides the list of attributes used after the filter is
+		applied. For the case of filter, the attributes always remain the same
+		and the vector is formatted and returned.
 
 	Project = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    class Project : public Iterator() is the implememntation of an iterator class to add the 
-    option of projection to the querying engine. It will take tuples passed by
-    previous iterators and project a vector of string names of attributes to remain, and 
-    return this updated tuple.
+	class Project : public Iterator() is the implememntation of an iterator
+	class to add the option of projection to the querying engine. It will take
+	tuples passed by previous iterators and project a vector of string names of
+	attributes to remain, and return this updated tuple.
 
-    Iterator *input:                An input iterator that provides entries to the projection
-    vector<string> attrNames:       A vector of attribute names to be provided to iterators using projection
-    vector<Attribute> inputAttrs:   The set of aattributes provided by the input iterator
-    unsigned inputTupleSize:        The size of the tuple being provided by the input iterator.
+	Iterator *input:
+		An input iterator that provides entries to the projection.
+	vector<string> attrNames:	
+		A vector of attribute names to be provided to iterators using
+		projection.
+	vector<Attribute> inputAttrs:
+		The set of aattributes provided by the input iterator.
+	unsigned inputTupleSize:
+		The size of the tuple being provided by the input iterator.
 
-    RC getNextTuple(void *data)
-        getNextTuple will call the api of the input iterator for the next entry in 
-        the list and pass the needed arguments to projectAttributes to remove un-needed 
-        attributes. This data will be returned to getNextTuple which will serve this 
-        newly projected data to the caller of the function.
+	RC getNextTuple(void *data)
+		getNextTuple will call the api of the input iterator for the next entry
+		in the list and pass the needed arguments to projectAttributes to remove
+		unneeded attributes. This data will be returned to getNextTuple which
+		will serve this newly projected data to the caller of the function.
 
-    void getAttributes(vector<Attribute> &attrs) const
-        getAttributes returns the vector of attributes remaining after the attributes are 
-        removed by the projection.
-    
-    RC projectAttributes(void *origData, void *newData)
-        projectAttributes will take in origData from getNextTuple and copy segments of data 
-        that are needed post projection, per data type. It will also update the nullIndicator at the 
-        beginning of the tuple. 
-    
+	void getAttributes(vector<Attribute> &attrs) const
+		getAttributes returns the vector of attributes remaining after the
+		attributes are removed by the projection.
+	
+	RC projectAttributes(void *origData, void *newData)
+		projectAttributes will take in origData from getNextTuple and copy
+		segments of data that are needed post projection, per data type. It
+		will also update the nullIndicator at the beginning of the tuple. 
 
 	INLJoin = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
