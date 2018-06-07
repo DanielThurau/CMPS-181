@@ -1,8 +1,8 @@
 1. Basic information
 Team number (e.g., 01) : 15
-#1 Student ID : 
+#1 Student ID : 1403225
 #1 Student Name : Morgan Grant
-#2 Student ID : +
+#2 Student ID : 1402341
 #2 Student Name : Daniel Thurau
 #3 Student ID : 1411983
 #3 Student Name : Preston Fraser
@@ -11,10 +11,14 @@ Team number (e.g., 01) : 15
 2. Catalog information about Index
 - Show what catalog information you store for an index. 
 
+	Added a table to the catalog, Indexes, which holds the name of the table
+	the index is on, the attribute of the table that index is on, and filename
+	containing the index of each index.
 
 3. Index Nested Loop Join
 - Describe how your Index Nested Loop Join works.
 
+	
 
 4. Implementation Detail
 - Have you added your own source file (.cc or .h)?
@@ -32,16 +36,62 @@ Team number (e.g., 01) : 15
     Iterator *leftIn:		    	The "outer" table of the join. 
     IndexScan *rightIn:				The "inner" table of the join.
     vector<Attribute> leftAttrs:	The 
-    vector<Attribute> rightAttrs;
-    unsigned leftInputTupleSize;
-    unsigned rightInputTupleSize;
+    vector<Attribute> rightAttrs:
+    unsigned leftInputTupleSize:
+    unsigned rightInputTupleSize:
 
 	RC CartProd::getNextTuple(void *data):
-		This function 
+		This function scans through all tuples in the outer table with rightIn
+		for every tuple of the inner table with leftIn, resetting the rightIn
+		iterator every time the inner table is completely scanned. When leftIn
+		reaches the last tuple, there are no more tuples in the Cartesian
+		Product to get.
+		This function reads the data from the outer table into leftData, the
+		data from the inner table into rightData and then reads the
+		concatenation of leftData + rightData into the data parameter, a tuple
+		from the Cartesian product.
+
+	RC CartProd::getAttributes(vector<Attribute> &attrs) const:
+		This function reads leftAttrs into attrs, and then rightAttrs into
+		attrs right after, providing the complete set of attributes for the
+		cartesian product.
 
 - Other implementation details:
 
+	Catalog = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+	createCatalog() now creates the Indexes table, deleteCatalog() deletes
+	the Indexes table. deleteTable() deletes all of the indexes on the table
+	being deleted. insertTuple() adds the tuple to every relevant index on the
+	table. deleteTuple() removes the tuple from every relevant index on the
+	table.
+
+	updateIndexes() is the function used in insertTuple() to perform the update
+	on the relevant indexes. createIndex() creates an index through the Index
+	Manager and adds it to the Indexes catalog.	destroyIndex() destroys the
+	index through the Index Manager and updates the Indexes catalog
+	accordingly.
+
+	RM_IndexScanIterator = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+	RM_IndexScanIterator just implements the corresponding functions from the
+	IX_ScanIterator.
+
+	Filter = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+
+
+	Project = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+
+
+	INLJoin = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+
+
+	
 
 5. Other (optional)
-- Freely use this section to tell us about things that are related to the project 4, but not related to the other sections (optional)
+- Freely use this section to tell us about things that are related to the
+  project 4, but not related to the other sections (optional)
 
