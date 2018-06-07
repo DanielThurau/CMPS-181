@@ -42,10 +42,10 @@ Team number (e.g., 01) : 15
 
     Iterator *leftIn:		    	The "outer" table of the join. 
     IndexScan *rightIn:				The "inner" table of the join.
-    vector<Attribute> leftAttrs:	The 
-    vector<Attribute> rightAttrs:
-    unsigned leftInputTupleSize:
-    unsigned rightInputTupleSize:
+    vector<Attribute> leftAttrs:	Attributes of "outer" table.
+    vector<Attribute> rightAttrs:	Attributes of "outer" table.
+    unsigned leftInputTupleSize:	The size of all tuples in the "outer".
+    unsigned rightInputTupleSize:	The size of all tuples in the "inner".
 
 	RC CartProd::getNextTuple(void *data):
 		This function scans through all tuples in the outer table with rightIn
@@ -65,24 +65,61 @@ Team number (e.g., 01) : 15
 
 - Other implementation details:
 
-	Catalog = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+	RelationManager = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-	createCatalog() now creates the Indexes table, deleteCatalog() deletes
-	the Indexes table. deleteTable() deletes all of the indexes on the table
-	being deleted. insertTuple() adds the tuple to every relevant index on the
-	table. deleteTuple() removes the tuple from every relevant index on the
-	table.
+	Changes to existing functions:
+	- createCatalog() now creates the Indexes table.
+	- deleteCatalog() deletes the Indexes table.
+	- deleteTable() deletes all of the indexes on the table being deleted.
+	- insertTuple() adds the tuple to every relevant index on the table.
+	- deleteTuple() removes the tuple from every relevant index on thetable.
 
-	updateIndexes() is the function used in insertTuple() to perform the update
-	on the relevant indexes. createIndex() creates an index through the Index
-	Manager and adds it to the Indexes catalog.	destroyIndex() destroys the
-	index through the Index Manager and updates the Indexes catalog
-	accordingly.
+	Implemented and new functions:
+	RC createIndex(const string &tableName, const string &attributeName):
+		Creates an index through the IndexManager and adds it to the Indexes
+		table in the catalog.
+
+	RC destroyIndex(const string &tableName, const string &attributeName):
+		Destroys the index through the IndexManager and updates the Indexes
+		table in the catalog accordingly.
+
+	RC indexScan(const string &tableName, const string &attributeName,
+	  const void *lowKey, const void *highKey, bool lowKeyInclusive,
+	  bool highKeyInclusive, RM_IndexScanIterator &rm_IndexScanIterator):
+		Opens the file using the IndexManager then obtains the attribute for
+		the record using attributeName in getAttributes(). Lastly, it scans
+		using rm_IndexScanIterator.
+
+	RC getIndexFilename(const string &tableName, const string &attributeName,
+	  string &fileName, RID &rid):
+	  	Obtains the name of the file containing the index by scanning through
+	  	all indexes created for tableName contained in the Indexes table. This
+	  	is done until we find a match on the attribute the index was created
+	  	on. When the match is established, we obtain the name from the index
+	  	and set fileName to that value. If no match was found, a corresponding
+	  	RC is returned.
+
+	RC updateIndexes(const string &tableName, const void *data,
+	  const RID &rid):
+	  	This function is called whenever a tuple is being inserted into the
+	  	table that this index is on. It extracts the matching attribute from
+	  	the tuple and enters rid and key into the respective index.
+
+	void getAttrFromTuple(const vector<Attribute> attrs, int index,
+	  const void *tuple, void *&data):
+	  	Extracts the desired attribute at index from tuple and reads it into
+	  	data.
 
 	RM_IndexScanIterator = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-	RM_IndexScanIterator just implements the corresponding functions from the
-	IX_ScanIterator.
+	IX_ScanIterator ix_scanIterator:	Iterator for the index.
+	IXFileHandle ixfileHandle:			File handle of the index being scanned
+
+	RC getNextEntry(RID &rid, void *key):
+		Returns the result of getNextEntry(rid, key) under ix_scaniterator.
+
+	RC close():
+		Closes the ix_scanIterator as well as the ixfileFileHandle.
 
 	Filter = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
