@@ -18,13 +18,13 @@ Team number (e.g., 01) : 15
 3. Index Nested Loop Join
 - Describe how your Index Nested Loop Join works.
 
-    We reduce the complexity of the problem of Nested Loop Join by creating a new
-    iterator class called CartesianProduct (see section 4 for more details) that 
-    will create the same Iterator API used throughout the project. The 
-    CartesianProduct of the two attributes from the two tuples will then allow 
-    for a filter iterator to apply the condition specified originally in 
-    the INLJoin iterator, and return a joined tuple at every call of 
-    INLJoin.getNextTuple().
+	We reduce the complexity of the problem of Nested Loop Join by creating a new
+	iterator class called CartesianProduct (see section 4 for more details) that 
+	will create the same Iterator API used throughout the project. The 
+	CartesianProduct of the two attributes from the two tuples will then allow 
+	for a filter iterator to apply the condition specified originally in 
+	the INLJoin iterator, and return a joined tuple at every call of 
+	INLJoin.getNextTuple().
 	
 
 4. Implementation Detail
@@ -195,28 +195,31 @@ Team number (e.g., 01) : 15
 
 	INLJoin = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-    class INLJoin : public Iterator() is the implememntation of an iterator class to add the 
-    option of joins to the querying engine. It will take two tuples passed by previous iterators 
-    and join the two tuples on given conditional attributes.
+	class INLJoin : public Iterator() is the implememntation of an iterator
+	class to add the option of joins to the querying engine. It will take two
+	tuples passed by previous iterators and join the two tuples on given
+	conditional attributes.
 
-    Iterator *leftIn
-    IndexScan *rightIn
-    vector<Attribute> leftAttrs
-    vector<Attribute> rightAttrs
-    unsigned leftInputTupleSize
-    unsigned rightInputTupleSize
+	Iterator *leftIn
+	IndexScan *rightIn
+	vector<Attribute> leftAttrs
+	vector<Attribute> rightAttrs
+	unsigned leftInputTupleSize
+	unsigned rightInputTupleSize
 
-    INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn, const Condition &condition)
-        INLJoin's constructor creates the CartProd iterator using leftIn and rightIn 
-        iterators, and a filter iterator using the CartProd iterator and the condition value.
+	INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn,
+	  const Condition &condition):
+		INLJoin's constructor creates the CartProd iterator using leftIn and
+		rightIn iterators, and a filter iterator using the CartProd iterator
+		and the condition value.
 
-    RC INLJoin::getNextTuple(void *data)
-        Calls the filter's getNextTuple which will filter the CartProd's conditional iterator's
-        value.
+	RC INLJoin::getNextTuple(void *data):
+		Calls the filter's getNextTuple which will filter the CartProd's
+		conditional iterator's value.
 
-    void INLJoin::getAttributes(vector<Attribute> &attrs) const
-        Returns the attributes of the returned data. No attributes are removed during the use
-        of this iterator.
+	void INLJoin::getAttributes(vector<Attribute> &attrs) const:
+		Returns the attributes of the returned data. No attributes are removed
+		during the use of this iterator.
 
 5. Other (optional)
 - Freely use this section to tell us about things that are related to the
