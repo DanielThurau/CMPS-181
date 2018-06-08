@@ -195,7 +195,7 @@ private:
   // update all indexes for the given table
   RC updateIndexes(const string &tableName, const void *data, const RID &rid);
   // get the index'th attribute from a tuple
-  void getAttrFromTuple(const vector<Attribute> attrs, int index, const void *tuple, void *&data);
+  RC getAttrFromTuple(const vector<Attribute> attrs, int index, const void *tuple, void *key);
 
   // Utility functions for converting single values to/from api format
   // Useful when using ScanIterators

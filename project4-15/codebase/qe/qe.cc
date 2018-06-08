@@ -383,7 +383,7 @@ RC CartProd::getNextTuple(void *data)
 	memcpy(data, leftData, leftTupleActualSize);
 	memcpy((char *) data + leftTupleActualSize, rightData, rightTupleActualSize);
 
-	free(rightData);
+	// free(rightData);
 	return SUCCESS;
 }
 
@@ -391,6 +391,7 @@ RC CartProd::getNextTuple(void *data)
 void CartProd::getAttributes(vector<Attribute> &attrs) const
 {
 	attrs.clear();
-	copy(leftAttrs.begin(), leftAttrs.end(), attrs.begin());
+	// copy(leftAttrs.begin(), leftAttrs.end(), attrs.begin());
+	attrs = leftAttrs;
 	attrs.insert(attrs.end(), rightAttrs.begin(), rightAttrs.end());
 }

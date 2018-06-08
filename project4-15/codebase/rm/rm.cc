@@ -882,25 +882,45 @@ void RelationManager::fromAPI(float &real, void *data)
     real = tmp;
 }
 
-void RelationManager::getAttrFromTuple(const vector<Attribute> attrs, int index, const void *tuple, void *&data) {
-    // set data to point to first attr in tuple
+// Standardized way of getting attribute from tuple
+// returns void * corresponding value w/o null indicator
+RC RelationManager::getAttrFromTuple(const vector<Attribute> attrs, int index, const void *tuple, void *key) {
+    // set key to point to first attr in tuple
     // skip null bytes
     int nullIndicatorSize = int(ceil((double) attrs.size() / CHAR_BIT));
-    data = (char*) tuple + nullIndicatorSize;
-    // advance data through fields until we reach index
+
+    uint32_t offset = nullIndicatorSize;
+
+    // advance key through fields until we reach index
     for (int i = 0; i < index; i++) {
         switch (attrs[i].type) {
         case TypeInt:
         case TypeReal:
-            data = (char*) data + attrs[i].length; 
+            offset += INT_SIZE;
             break;
         case TypeVarChar:
             uint32_t varchar_length;
-            memcpy(&varchar_length, data, VARCHAR_LENGTH_SIZE);
-            data = (char*) data + VARCHAR_LENGTH_SIZE + varchar_length;
+            memcpy(&varchar_length, (char*)tuple + offset, VARCHAR_LENGTH_SIZE);
+            offset += VARCHAR_LENGTH_SIZE + varchar_length;
             break;
         }
     }
+
+    // switch on data type for memcpy
+    switch (attrs[index].type) {
+    case TypeInt:
+    case TypeReal:
+        memcpy(key, (char*)tuple + offset, INT_SIZE);
+        break;
+    case TypeVarChar:
+        uint32_t varchar_length;
+        memcpy(&varchar_length, (char*)tuple + offset, VARCHAR_LENGTH_SIZE);
+        memcpy(key, (char*)tuple + offset, varchar_length + VARCHAR_LENGTH_SIZE);
+        break;
+    }
+
+    return SUCCESS;
+
 }
 
 RC RelationManager::updateIndexes(const string &tableName, const void *data, const RID &rid) {
@@ -908,7 +928,7 @@ RC RelationManager::updateIndexes(const string &tableName, const void *data, con
     IndexManager *im = IndexManager::instance();
 
     // turn tableName into API format
-    void *value = malloc(INDEXES_COL_TABLE_NAME_SIZE);
+    void *value = malloc(tableName.length() + VARCHAR_LENGTH_SIZE);
     uint32_t tableNameLength = tableName.length();
     memcpy(value, &tableNameLength, VARCHAR_LENGTH_SIZE);
     memcpy((char*) value + VARCHAR_LENGTH_SIZE, tableName.c_str(), tableNameLength);
@@ -950,7 +970,7 @@ RC RelationManager::updateIndexes(const string &tableName, const void *data, con
         tmp_filename[filenameLength] = '\0';
         string fileName = string(tmp_filename);
 
-        // get attribute matching attribute name from vector of attributes for this table
+        // get attribute matching attribute-name from vector of attributes for this table
         auto pred = [&](Attribute a) { return a.name == attrName; };
         vector<Attribute>::iterator attr = find_if(tableAttrs.begin(), tableAttrs.end(), pred);
         if (attr == tableAttrs.end()) {
@@ -960,8 +980,8 @@ RC RelationManager::updateIndexes(const string &tableName, const void *data, con
             return RM_ATTR_NOT_FOUND;
         }
 
-        // extract just the attribute we want from tuple
-        void *key;
+        // key is now malloc'd and has value when getAttrFromtuple runs
+        void *key = malloc(attr->length);
         getAttrFromTuple(tableAttrs, attr - tableAttrs.begin(), data, key);
 
         // open index file and insert
@@ -1073,22 +1093,41 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
     // get attribute for this attribute of this table
     vector<Attribute> recordDescriptor;
     getAttributes(tableName, recordDescriptor);
-    auto pred = [&](Attribute a) { return a.name == attributeName; };
-    vector<Attribute>::iterator attr = find_if(recordDescriptor.begin(), recordDescriptor.end(), pred);
 
     rc = scan(tableName, "", NO_OP, NULL, projectionAttributes, scanner);
     if (rc)
         return rc;
     
-    // alloc a buffer big enough for the attribute + null indicator
-    void *key = malloc(attr->length + 1);
+
+    // determine tuple size for malloc of tableData
+    uint32_t tupleSize = int(ceil((double) recordDescriptor.size() / CHAR_BIT));;
+    for(unsigned i = 0; i < recordDescriptor.size(); i++){
+        tupleSize += recordDescriptor[i].length;
+    }
+
+    // tableData is tuple returned from scan of existing table, to input into newly
+    // created ndex
+    void *tableData = malloc(tupleSize);
 
     IXFileHandle ixfileHandle;
-    im->openFile(index_filename, ixfileHandle);
-    while (scanner.getNextTuple(rid, key) != RM_EOF) {
-        // insert each entry into the index
-        // use key + 1 to skip null indicator
-        im->insertEntry(ixfileHandle, *attr, (char *) key + 1, rid);
+    if(im->openFile(index_filename, ixfileHandle)){
+        return 1;
+    }
+
+
+    // returns each entry of specified tableName
+    while ((rc = scanner.getNextTuple(rid, tableData)) == SUCCESS) {
+
+
+        // get attribute matching attribute-name from vector of attributes for this table
+        auto pred = [&](Attribute a) { return a.name == attributeName; };
+        vector<Attribute>::iterator attr = find_if(recordDescriptor.begin(), recordDescriptor.end(), pred);
+
+        // extract just the attribute we want from tuple
+        void *key = malloc(attr->length);
+        getAttrFromTuple(recordDescriptor, attr - recordDescriptor.begin(), tableData, key);
+
+        im->insertEntry(ixfileHandle, *attr, key, rid);
     }
     im->closeFile(ixfileHandle);
 
