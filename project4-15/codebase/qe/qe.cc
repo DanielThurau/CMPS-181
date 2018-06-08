@@ -49,7 +49,6 @@ Filter::Filter(Iterator* input, const Condition &condition)
 {
 	this->input = input;
 	this->attrNames = attrNames;
-
 	this->cond = condition;
 
 
@@ -84,7 +83,6 @@ RC Filter::getNextTuple(void *data)
 	bool status = false;
 	RC rc;
 	while((rc = input ->getNextTuple(origData)) == SUCCESS) {
-		std::cout << rc << std::endl;
 		unsigned nullIndicatorSize = getNumNullBytes(inputAttrs.size());
 
 		// value at this position is null
@@ -298,11 +296,7 @@ RC Project::projectAttributes(void *origData, void *newData) {
 void Project::getAttributes(vector<Attribute> &attrs) const
 {
 	attrs.clear();
-	for (string attrName: attrNames) {
-		auto pred = [&](Attribute attr) { return attr.name == attrName; };
-		vector<Attribute>::const_iterator attr = find_if(inputAttrs.begin(), inputAttrs.end(), pred);
-		attrs.push_back(*attr);
-	}
+	attrs = inputAttrs;
 }
 
 INLJoin::INLJoin(Iterator *leftIn,
