@@ -45,54 +45,56 @@ RC testCase_5() {
 	int valueB = 0;
 	int valueD = 0;
 
-	while (filter->getNextTuple(data) != QE_EOF) {
-		int offset = 0;
+	while (is->getNextTuple(data) == SUCCESS) {
+
+		cout << *(float*)data << endl;
+		// int offset = 0;
 		
-		// is an attribute B NULL?
-		nullBit = *(unsigned char *)((char *)data) & (1 << 7);
-		if (nullBit) {
-			cerr << endl << "***** A returned value is not correct. *****" << endl;
-			rc = fail;
-			goto clean_up;
-		}
-		valueB = *(int *)((char *)data+1+offset);
+		// // is an attribute B NULL?
+		// nullBit = *(unsigned char *)((char *)data) & (1 << 7);
+		// if (nullBit) {
+		// 	cerr << endl << "***** A returned value is not correct. *****" << endl;
+		// 	rc = fail;
+		// 	goto clean_up;
+		// }
+		// valueB = *(int *)((char *)data+1+offset);
 
-		// Print right.B
-		cerr << "right.B " << valueB;
-		offset += sizeof(int);
+		// // Print right.B
+		// cerr << "right.B " << valueB;
+		// offset += sizeof(int);
 
-		// is an attribute C NULL?
-		nullBit = *(unsigned char *)((char *)data) & (1 << 6);
-		if (nullBit) {
-			cerr << endl << "***** A returned value is not correct. *****" << endl;
-			rc = fail;
-			goto clean_up;
-		}
-		valueC = *(float *)((char *)data+1+offset);
+		// // is an attribute C NULL?
+		// nullBit = *(unsigned char *)((char *)data) & (1 << 6);
+		// if (nullBit) {
+		// 	cerr << endl << "***** A returned value is not correct. *****" << endl;
+		// 	rc = fail;
+		// 	goto clean_up;
+		// }
+		// valueC = *(float *)((char *)data+1+offset);
 		
-		// Print right.C
-		cerr << "  right.C " << valueC;
-		offset += sizeof(float);
-		if (valueC < compVal) {
-			rc = fail;
-			goto clean_up;
-		}
+		// // Print right.C
+		// cerr << "  right.C " << valueC;
+		// offset += sizeof(float);
+		// if (valueC < compVal) {
+		// 	rc = fail;
+		// 	goto clean_up;
+		// }
 
-		// is an attribute D NULL?
-		nullBit = *(unsigned char *)((char *)data) & (1 << 5);
-		if (nullBit) {
-			cerr << endl << "***** A returned value is not correct. *****" << endl;
-			rc = fail;
-			goto clean_up;
-		}
-		valueD = *(int *)((char *)data+1+offset);
+		// // is an attribute D NULL?
+		// nullBit = *(unsigned char *)((char *)data) & (1 << 5);
+		// if (nullBit) {
+		// 	cerr << endl << "***** A returned value is not correct. *****" << endl;
+		// 	rc = fail;
+		// 	goto clean_up;
+		// }
+		// valueD = *(int *)((char *)data+1+offset);
 
-		// Print right.D
-		cerr << "  right.D " << valueD << endl;
-		offset += sizeof(int);
+		// // Print right.D
+		// cerr << "  right.D " << valueD << endl;
+		// offset += sizeof(int);
 
-		memset(data, 0, bufSize);
-		actualResultCnt++;
+		// memset(data, 0, bufSize);
+		// actualResultCnt++;
 	}
 	if (expectedResultCnt != actualResultCnt) {
 		cerr << "***** The number of returned tuple is not correct. *****" << endl;

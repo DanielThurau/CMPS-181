@@ -16,9 +16,9 @@ RC testCase_2() {
 	RC rc = success;
 	cerr << endl << "***** In QE Test Case 2 *****" << endl;
 
-	rc = createIndexforRightB();
+	rc = createIndexforRightC();
 	if (rc != success) {
-		cerr << "***** createIndexforRightB() failed.  *****" << endl;
+		cerr << "***** createIndexforRightC() failed.  *****" << endl;
 		return rc;
 	}
 
@@ -28,9 +28,11 @@ RC testCase_2() {
 		return rc;
 	}
 
-	rc = createIndexforRightC();
+	
+
+	rc = createIndexforRightB();
 	if (rc != success) {
-		cerr << "***** createIndexforRightC() failed.  *****" << endl;
+		cerr << "***** createIndexforRightB() failed.  *****" << endl;
 		return rc;
 	}
 

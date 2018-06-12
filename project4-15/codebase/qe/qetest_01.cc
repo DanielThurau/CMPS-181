@@ -36,6 +36,32 @@ int testCase_1() {
 		cerr << "***** createIndexforLeftC() failed.  *****" << endl;
 		return rc;
 	}
+
+	IndexScan *is = new IndexScan(*rm, "right", "C");
+
+	// Set up condition
+	Condition cond;
+	cond.lhsAttr = "left.C";
+	cond.op = NO_OP;
+	cond.bRhsIsAttr = false;
+	Value value;
+	value.type = TypeReal;
+	
+	value.data = malloc(bufSize);
+	*(int *) value.data = 0;
+	cond.rhsValue = value;
+
+		void *data = malloc(bufSize);
+
+	cout << "Wjat" << endl;
+
+	while (is->getNextTuple(data) == SUCCESS) {
+
+		cout << *(int*)data << endl;
+
+	}
+		cout << "the ufk" << endl;
+
 	return rc;
 }
 
